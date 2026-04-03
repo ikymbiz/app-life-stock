@@ -17,6 +17,27 @@
   <link rel="stylesheet" href="style.css">
   <style>
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    /* Scan buttons */
+    .scan-btn-primary {
+      display:flex; flex-direction:column; align-items:center; gap:3px;
+      padding:12px 8px; border-radius:10px; cursor:pointer;
+      background:var(--blue-dim); border:1px solid rgba(77,166,255,.35);
+      color:var(--blue); font-family:var(--font-body); transition:all .15s;
+    }
+    .scan-btn-primary:active { transform:scale(.97); }
+    .scan-btn-ai {
+      display:flex; flex-direction:column; align-items:center; gap:3px;
+      padding:12px 8px; border-radius:10px; cursor:pointer;
+      background:var(--green-dim); border:1px solid var(--green-border);
+      color:var(--green); font-family:var(--font-body); transition:all .15s;
+    }
+    .scan-btn-ai:active { transform:scale(.97); }
+    .scan-btn-sub {
+      padding:9px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600;
+      background:var(--bg-3); border:1px solid var(--border-med); color:var(--txt-2);
+      font-family:var(--font-body); transition:all .15s;
+    }
+    .scan-btn-sub:active { background:var(--bg-hover); }
   </style>
 </head>
 <body>
@@ -26,7 +47,7 @@
     <div class="header-inner">
       <div class="logo">
         <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
-          <path d="M16 2L4 8v8c0 7.2 5.2 13.9 12 15.5C23.8 29.9 28 23.2 28 16V8L16 2z" fill="var(--accent-red,#e63950)" opacity="0.9"/>
+          <path d="M16 2L4 8v8c0 7.2 5.2 13.9 12 15.5C23.8 29.9 28 23.2 28 16V8L16 2z" fill="var(--red)" opacity="0.9"/>
           <path d="M13 16l2.5 2.5L20 12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span class="logo-text">LifeStock</span>
@@ -98,31 +119,21 @@
   </div>
 </div>
 
+<!-- html5-qrcode は使用時に遅延ロード -->
+<div id="__temp_scan__" style="display:none;"></div>
+
 <div id="toast-container"></div>
 
-<!-- QRCode.js -->
+<!-- QRCode.js（緊急カード用） -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
   integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSe2HkjGVMFbO3sAMbFPEECZCM9Pi0Kx4O7g=="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-<!-- Tesseract.js OCR（遅延ロード） -->
-<script>
-  // Tesseract は使用時に初めてロード
-  function loadTesseract() {
-    return new Promise((resolve, reject) => {
-      if (typeof Tesseract !== 'undefined') { resolve(); return; }
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-      s.onload  = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
-  window.loadTesseract = loadTesseract;
-</script>
-
+<!-- App modules -->
 <script src="db.js"></script>
 <script src="app.js"></script>
+<script src="vision.js"></script>
+<script src="barcode.js"></script>
 <script src="dashboard.js"></script>
 <script src="inventory.js"></script>
 <script src="profiles.js"></script>
