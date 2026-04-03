@@ -64,7 +64,7 @@ const VisionAI = (() => {
 
   async function _callOpenAI(apiKey, model, b64, prompt, type) {
     const body = { model, max_tokens:200, temperature:0.1,
-      messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+b64,detail:'low'}}]}] };
+      messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+b64,detail:'auto'}}]}] };
     if (type === 'quick') body.response_format = { type:'json_object' };
     const res = await fetch('https://api.openai.com/v1/chat/completions',
       { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey}, body:JSON.stringify(body) });
@@ -119,7 +119,7 @@ const VisionAI = (() => {
       img.src=url;
     });
   }
-  function compressForAI(file)      { return _compress(file, 384, 0.5); }
+  function compressForAI(file)      { return _compress(file, 1024, 0.7); }
   function compressForStorage(file) { return _compress(file, 900, 0.72); }
 
   // スキャン回数
@@ -135,7 +135,7 @@ const VisionAI = (() => {
     let m = list.find(x=>x.id===modelId);
     if (!m && list.length) m = list[0];
     if (!m) return 0;
-    return Math.round(((300/1e6)*m.inputPer1M + (80/1e6)*m.outputPer1M)*150*100)/100;
+    return Math.round(((1000/1e6)*m.inputPer1M + (80/1e6)*m.outputPer1M)*150*100)/100;
   }
 
   async function estimateCostYen() {
