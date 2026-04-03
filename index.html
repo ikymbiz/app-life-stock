@@ -15,16 +15,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <style>
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  </style>
 </head>
 <body>
 
 <div id="app">
-  <!-- Header -->
   <header id="app-header">
     <div class="header-inner">
       <div class="logo">
         <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
-          <path d="M16 2L4 8v8c0 7.2 5.2 13.9 12 15.5C23.8 29.9 28 23.2 28 16V8L16 2z" fill="var(--accent-red)" opacity="0.9"/>
+          <path d="M16 2L4 8v8c0 7.2 5.2 13.9 12 15.5C23.8 29.9 28 23.2 28 16V8L16 2z" fill="var(--accent-red,#e63950)" opacity="0.9"/>
           <path d="M13 16l2.5 2.5L20 12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span class="logo-text">LifeStock</span>
@@ -37,16 +39,14 @@
     </div>
   </header>
 
-  <!-- Main content -->
   <main id="main-content">
     <div id="page-dashboard" class="page active"></div>
-    <div id="page-inventory" class="page"></div>
-    <div id="page-profiles" class="page"></div>
-    <div id="page-shopping" class="page"></div>
-    <div id="page-settings" class="page"></div>
+    <div id="page-inventory"  class="page"></div>
+    <div id="page-profiles"   class="page"></div>
+    <div id="page-shopping"   class="page"></div>
+    <div id="page-settings"   class="page"></div>
   </main>
 
-  <!-- Bottom Navigation -->
   <nav id="bottom-nav">
     <button class="nav-item active" data-page="dashboard">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -87,7 +87,6 @@
   </nav>
 </div>
 
-<!-- Full-screen Modal -->
 <div id="modal-bg" class="modal-bg hidden" onclick="Modal.closeBg(event)">
   <div id="modal-sheet" class="modal-sheet">
     <div class="modal-drag-bar"></div>
@@ -99,15 +98,29 @@
   </div>
 </div>
 
-<!-- Toast -->
 <div id="toast-container"></div>
 
 <!-- QRCode.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
-        integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSe2HkjGVMFbO3sAMbFPEECZCM9Pi0Kx4O7g=="
-        crossorigin="anonymous"></script>
+  integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSe2HkjGVMFbO3sAMbFPEECZCM9Pi0Kx4O7g=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-<!-- App modules (order matters) -->
+<!-- Tesseract.js OCR（遅延ロード） -->
+<script>
+  // Tesseract は使用時に初めてロード
+  function loadTesseract() {
+    return new Promise((resolve, reject) => {
+      if (typeof Tesseract !== 'undefined') { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      s.onload  = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  window.loadTesseract = loadTesseract;
+</script>
+
 <script src="db.js"></script>
 <script src="app.js"></script>
 <script src="dashboard.js"></script>
@@ -117,12 +130,11 @@
 <script src="settings.js"></script>
 
 <script>
-  // Boot
   (async () => {
     await DB.init();
     App.init();
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
     }
   })();
 </script>

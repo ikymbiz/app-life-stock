@@ -844,3 +844,139 @@ body {
 /* ── DANGER ZONE ── */
 .danger-zone { border-color: var(--red-border) !important; background: var(--red-dim) !important; }
 .danger-zone .settings-item-title { color: var(--red); }
+
+/* ── ALLERGEN STYLES ── */
+.item-allergen-warn {
+  border-left: 3px solid var(--amber) !important;
+}
+.allergen-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--amber-dim);
+  color: var(--amber);
+  border: 1px solid var(--amber-border);
+  white-space: nowrap;
+}
+.allergen-who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.allergen-who-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(245, 156, 42, 0.18);
+  color: var(--amber);
+  border: 1px solid var(--amber-border);
+}
+.allergen-item-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--bg-3);
+  color: var(--txt-2);
+  border: 1px solid var(--border);
+}
+.allergen-toggle-btn {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  background: var(--bg-3);
+  border: 1px solid var(--border-med);
+  border-radius: 6px;
+  color: var(--txt-2);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.allergen-toggle-btn.active {
+  background: var(--amber-dim);
+  border-color: var(--amber-border);
+  color: var(--amber);
+  font-weight: 700;
+}
+.allergen-chip-selected {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: var(--amber-dim);
+  color: var(--amber);
+  border: 1px solid var(--amber-border);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.allergen-chip-selected:hover { opacity: 0.7; }
+
+/* ── PHOTO GALLERY STYLES ── */
+.photo-thumb-wrap {
+  position: relative;
+  width: 80px;
+  flex-shrink: 0;
+}
+.photo-thumb {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border-med);
+  display: block;
+}
+.photo-caption {
+  font-size: 9px;
+  color: var(--txt-3);
+  text-align: center;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.photo-delete-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  background: rgba(230, 57, 80, 0.85);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.photo-add-btn {
+  background: var(--bg-3);
+  border: 1px dashed var(--border-med);
+  border-radius: 8px;
+  padding: 8px 4px;
+  color: var(--txt-3);
+  font-size: 16px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+  font-family: var(--font-body);
+  line-height: 1.4;
+}
+.photo-add-btn span {
+  display: block;
+  font-size: 10px;
+  margin-top: 2px;
+}
+.photo-add-btn:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: var(--blue-dim);
+}
