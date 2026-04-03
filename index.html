@@ -1,135 +1,233 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html class="light" lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#080c12">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="LifeStock">
-  <meta name="description" content="防災・備蓄管理アプリ LifeStock — もしもの時に、物と健康を迷わず守る">
-  <title>LifeStock — 防災・備蓄管理</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <style>
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-    /* Scan buttons */
-    .scan-btn-primary {
-      display:flex; flex-direction:column; align-items:center; gap:3px;
-      padding:12px 8px; border-radius:10px; cursor:pointer;
-      background:var(--blue-dim); border:1px solid rgba(77,166,255,.35);
-      color:var(--blue); font-family:var(--font-body); transition:all .15s;
-    }
-    .scan-btn-primary:active { transform:scale(.97); }
-    .scan-btn-ai {
-      display:flex; flex-direction:column; align-items:center; gap:3px;
-      padding:12px 8px; border-radius:10px; cursor:pointer;
-      background:var(--green-dim); border:1px solid var(--green-border);
-      color:var(--green); font-family:var(--font-body); transition:all .15s;
-    }
-    .scan-btn-ai:active { transform:scale(.97); }
-    .scan-btn-sub {
-      padding:9px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600;
-      background:var(--bg-3); border:1px solid var(--border-med); color:var(--txt-2);
-      font-family:var(--font-body); transition:all .15s;
-    }
-    .scan-btn-sub:active { background:var(--bg-hover); }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#FFFFFF"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="SENTINEL"/>
+<title>SENTINEL — 防災備蓄管理</title>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#2D918B",
+        "primary-container": "#D1EBE9",
+        "on-primary": "#FFFFFF",
+        "secondary": "#5DA7A3",
+        "secondary-container": "#E0F2F1",
+        "tertiary": "#F2994A",
+        "background": "#F8FBFB",
+        "surface": "#FFFFFF",
+        "surface-variant": "#F0F4F4",
+        "on-surface": "#1A1C1C",
+        "on-surface-variant": "#3F4948",
+        "outline": "#6F7979",
+        "error": "#BA1A1A",
+      },
+      borderRadius: { DEFAULT:"1.5rem", lg:"2rem", xl:"2.5rem", full:"9999px" },
+      fontFamily: {
+        headline: ["Quicksand","Noto Sans JP","sans-serif"],
+        body: ["Noto Sans JP","sans-serif"],
+        label: ["Quicksand","sans-serif"],
+      },
+    },
+  },
+}
+</script>
+<style>
+.material-symbols-rounded { font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24; }
+::-webkit-scrollbar { width:0; background:transparent; }
+body { min-height:100dvh; }
+
+/* Page transitions */
+.page { display:none; }
+.page.active { display:block; animation:pageIn .25s ease-out; }
+@keyframes pageIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* Modal */
+.modal-overlay { display:none; position:fixed; inset:0; z-index:100; }
+.modal-overlay.visible { display:flex; }
+.modal-overlay .modal-backdrop { position:absolute; inset:0; background:rgba(0,0,0,.35); }
+.modal-overlay .modal-sheet {
+  position:absolute; bottom:0; left:0; right:0;
+  max-height:92vh; overflow-y:auto; overscroll-behavior:contain;
+  background:#fff; border-radius:1.5rem 1.5rem 0 0;
+  transform:translateY(0); transition:transform .25s ease;
+  padding-bottom:env(safe-area-inset-bottom,0);
+}
+.modal-overlay:not(.visible) .modal-sheet { transform:translateY(100%); }
+
+/* Scan button styles for inventory form */
+.scan-btn-ai {
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:14px; border-radius:12px; cursor:pointer; border:1.5px solid #D1EBE9;
+  background:#F8FBFB; color:#2D918B; font-family:'Noto Sans JP',sans-serif; transition:all .15s;
+}
+.scan-btn-ai:active { transform:scale(.97); background:#D1EBE9; }
+
+/* Form compat styles */
+.form-input { width:100%; padding:10px 14px; border:1px solid #E0F2F1; border-radius:12px; font-size:14px; background:#F8FBFB; outline:none; transition:border .15s; }
+.form-input:focus { border-color:#2D918B; }
+.form-select { width:100%; padding:10px 14px; border:1px solid #E0F2F1; border-radius:12px; font-size:14px; background:#F8FBFB; outline:none; }
+.form-textarea { width:100%; padding:10px 14px; border:1px solid #E0F2F1; border-radius:12px; font-size:14px; background:#F8FBFB; min-height:60px; outline:none; resize:vertical; }
+.form-label { display:block; font-size:12px; font-weight:700; color:#3F4948; margin-bottom:4px; }
+.form-group { margin-bottom:12px; }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.form-check { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; }
+.form-check-label { font-size:14px; }
+.btn { padding:10px 16px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; border:none; transition:all .15s; }
+.btn:active { transform:scale(.97); }
+.btn-primary { background:#2D918B; color:#fff; }
+.btn-secondary { background:#F0F4F4; color:#2D918B; border:1px solid #E0F2F1; }
+.btn-ghost { background:transparent; color:#3F4948; }
+.btn-danger { background:#FFEAEA; color:#BA1A1A; }
+.btn-sm { padding:8px 12px; font-size:12px; }
+.btn-row { display:flex; gap:8px; }
+.photo-add-btn { display:flex; flex-direction:column; align-items:center; gap:2px; padding:10px 6px; border-radius:10px; border:1px dashed #E0F2F1; background:#F8FBFB; cursor:pointer; font-size:11px; color:#3F4948; }
+.photo-add-btn:active { background:#E0F2F1; }
+.photo-thumb-wrap { position:relative; width:64px; height:64px; border-radius:8px; overflow:hidden; }
+.photo-thumb { width:100%; height:100%; object-fit:cover; }
+.photo-delete-btn { position:absolute; top:2px; right:2px; width:20px; height:20px; border-radius:50%; background:rgba(0,0,0,.5); color:#fff; font-size:10px; border:none; cursor:pointer; }
+.photo-caption { position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.5); color:#fff; font-size:9px; text-align:center; padding:1px; }
+.allergen-toggle-btn { padding:4px 10px; border-radius:8px; font-size:12px; border:1px solid #E0F2F1; background:#F8FBFB; cursor:pointer; color:#3F4948; }
+.allergen-toggle-btn.active { background:#D1EBE9; border-color:#2D918B; color:#2D918B; font-weight:700; }
+.allergen-chip-selected { padding:2px 8px; border-radius:6px; font-size:12px; background:#D1EBE9; color:#2D918B; cursor:pointer; }
+.item-card { background:#fff; border:1px solid #E0F2F1; border-radius:16px; padding:14px; margin-bottom:8px; cursor:pointer; transition:all .15s; }
+.item-card:active { transform:scale(.98); background:#F8FBFB; }
+.item-card-inner { display:flex; align-items:center; gap:12px; }
+.item-cat-icon { font-size:24px; width:40px; text-align:center; }
+.item-info { flex:1; min-width:0; }
+.item-name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.item-sub { font-size:11px; color:#6F7979; margin-top:2px; }
+.item-right { text-align:right; flex-shrink:0; }
+.item-qty { font-family:'Quicksand',sans-serif; font-weight:700; font-size:18px; }
+.expiry-badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 8px; border-radius:6px; margin-top:3px; }
+.expiry-ok { background:#D1EBE9; color:#2D918B; }
+.expiry-warn { background:#FFF3E0; color:#F2994A; }
+.expiry-urgent { background:#FFEAEA; color:#BA1A1A; }
+.expiry-expired { background:#BA1A1A; color:#fff; }
+.allergen-badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 8px; border-radius:6px; background:#FFEAEA; color:#BA1A1A; margin-top:3px; }
+.allergen-who { display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; }
+.allergen-who-badge, .allergen-item-badge { font-size:10px; padding:1px 6px; border-radius:4px; background:#FFEAEA; color:#BA1A1A; }
+.empty-state { text-align:center; padding:48px 16px; color:#6F7979; }
+.empty-icon { font-size:48px; margin-bottom:12px; }
+.empty-title { font-weight:700; font-size:16px; margin-bottom:4px; }
+.empty-sub { font-size:13px; }
+.filter-bar { display:flex; gap:6px; overflow-x:auto; padding:10px 0; -webkit-overflow-scrolling:touch; }
+.filter-chip { white-space:nowrap; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; border:1px solid #E0F2F1; background:#fff; color:#3F4948; cursor:pointer; }
+.filter-chip.active { background:#2D918B; color:#fff; border-color:#2D918B; }
+
+/* Nav active state */
+.nav-item.active { color:#2D918B !important; }
+.nav-item.active .material-symbols-rounded { font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24; }
+
+/* Toast */
+.toast { padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600;
+  background:#1A1C1C; color:#fff; box-shadow:0 4px 20px rgba(0,0,0,.15);
+  animation:toastIn .3s ease, toastOut .3s ease 2.3s forwards; }
+.toast.success { background:#2D918B; }
+.toast.error { background:#BA1A1A; }
+@keyframes toastIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+@keyframes toastOut { to{opacity:0;transform:translateY(-8px)} }
+
+/* Pulse animation for AI loading */
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+</style>
 </head>
-<body>
 
-<div id="app">
-  <header id="app-header">
-    <div class="header-inner">
-      <div class="logo">
-        <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
-          <path d="M16 2L4 8v8c0 7.2 5.2 13.9 12 15.5C23.8 29.9 28 23.2 28 16V8L16 2z" fill="var(--red)" opacity="0.9"/>
-          <path d="M13 16l2.5 2.5L20 12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span class="logo-text">LifeStock</span>
-      </div>
-      <div class="header-right">
-        <button id="emergency-btn" class="emergency-btn" onclick="App.showEmergencyCard()">
-          <span>🆘</span> 緊急カード
-        </button>
-      </div>
-    </div>
-  </header>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container selection:text-primary">
 
-  <main id="main-content">
-    <div id="page-dashboard" class="page active"></div>
-    <div id="page-inventory"  class="page"></div>
-    <div id="page-profiles"   class="page"></div>
-    <div id="page-shopping"   class="page"></div>
-    <div id="page-settings"   class="page"></div>
-  </main>
+<!-- ═══ TopAppBar ═══ -->
+<header class="fixed top-0 w-full z-50 flex items-center justify-between px-6 h-16 bg-white/80 backdrop-blur-md border-b border-secondary-container">
+  <div class="flex items-center gap-4">
+    <button class="text-primary hover:bg-primary-container/50 transition-colors p-2 rounded-full" onclick="App.navigate('settings')">
+      <span class="material-symbols-rounded">settings</span>
+    </button>
+    <h1 class="text-xl font-bold tracking-tight text-primary font-headline">SENTINEL</h1>
+  </div>
+  <div class="flex items-center gap-2">
+    <button class="text-on-surface-variant hover:bg-primary-container/50 transition-colors p-2 rounded-full" onclick="App.showEmergencyCard()">
+      <span class="material-symbols-rounded" style="font-variation-settings:'FILL' 1; color:#BA1A1A;">emergency</span>
+    </button>
+  </div>
+</header>
 
-  <nav id="bottom-nav">
-    <button class="nav-item active" data-page="dashboard">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-        <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-      </svg>
-      <span class="nav-label">ホーム</span>
-    </button>
-    <button class="nav-item" data-page="inventory">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
-        <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
-        <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
-      </svg>
-      <span class="nav-label">備蓄品</span>
-    </button>
-    <button class="nav-item nav-center" data-action="add-item">
-      <div class="nav-add-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-      </div>
-    </button>
-    <button class="nav-item" data-page="profiles">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-        <circle cx="12" cy="7" r="4"/>
-      </svg>
-      <span class="nav-label">健康カード</span>
-    </button>
-    <button class="nav-item" data-page="shopping">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-        <path d="M1 1h4l2.7 13.4a2 2 0 002 1.6h9.7a2 2 0 001.95-1.57l1.65-8.43H6"/>
-      </svg>
-      <span class="nav-label">買い物</span>
-    </button>
-  </nav>
-</div>
+<!-- ═══ Main Content (Pages) ═══ -->
+<main class="pt-20 pb-28 px-4 md:px-8 max-w-5xl mx-auto min-h-screen">
 
-<div id="modal-bg" class="modal-bg hidden" onclick="Modal.closeBg(event)">
+  <!-- Dashboard Page -->
+  <div id="page-dashboard" class="page active"></div>
+
+  <!-- Inventory Page -->
+  <div id="page-inventory" class="page"></div>
+
+  <!-- Profiles Page -->
+  <div id="page-profiles" class="page"></div>
+
+  <!-- Shopping Page -->
+  <div id="page-shopping" class="page"></div>
+
+  <!-- Settings Page -->
+  <div id="page-settings" class="page"></div>
+
+</main>
+
+<!-- ═══ BottomNavBar ═══ -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-2 bg-white/90 backdrop-blur-md border-t border-secondary-container rounded-t-[2.5rem] shadow-[0_-10px_30px_rgba(45,145,139,0.08)]">
+  <button class="nav-item flex flex-col items-center justify-center p-2 text-on-surface-variant hover:text-primary transition-all active:scale-90" data-page="dashboard">
+    <span class="material-symbols-rounded">grid_view</span>
+    <span class="font-label text-[10px] font-bold mt-1">Home</span>
+  </button>
+  <button class="nav-item flex flex-col items-center justify-center p-2 text-on-surface-variant hover:text-primary transition-all active:scale-90" data-page="inventory">
+    <span class="material-symbols-rounded">inventory_2</span>
+    <span class="font-label text-[10px] font-bold mt-1">Stock</span>
+  </button>
+  <div class="relative -top-5">
+    <button class="nav-item flex flex-col items-center justify-center bg-primary text-on-primary rounded-full w-14 h-14 shadow-lg shadow-primary/30 active:scale-90 transition-transform" data-action="add-item">
+      <span class="material-symbols-rounded text-2xl" style="font-variation-settings:'FILL' 1;">add_circle</span>
+    </button>
+    <span class="absolute -bottom-5 left-1/2 -translate-x-1/2 font-label text-[10px] font-bold text-primary whitespace-nowrap">Add</span>
+  </div>
+  <button class="nav-item flex flex-col items-center justify-center p-2 text-on-surface-variant hover:text-primary transition-all active:scale-90" data-page="shopping">
+    <span class="material-symbols-rounded">shopping_cart</span>
+    <span class="font-label text-[10px] font-bold mt-1">Cart</span>
+  </button>
+  <button class="nav-item flex flex-col items-center justify-center p-2 text-on-surface-variant hover:text-primary transition-all active:scale-90" data-page="profiles">
+    <span class="material-symbols-rounded">person</span>
+    <span class="font-label text-[10px] font-bold mt-1">Profile</span>
+  </button>
+</nav>
+
+<!-- ═══ Modal (Bottom Sheet) ═══ -->
+<div id="modal-bg" class="modal-overlay">
+  <div class="modal-backdrop" onclick="Modal.close()"></div>
   <div id="modal-sheet" class="modal-sheet">
-    <div class="modal-drag-bar"></div>
-    <div class="modal-header">
-      <h2 id="modal-title" class="modal-title"></h2>
-      <button class="modal-close-btn" onclick="Modal.close()">✕</button>
+    <div class="flex justify-center pt-3 pb-1"><div class="w-10 h-1 rounded-full bg-outline/30"></div></div>
+    <div class="flex items-center justify-between px-6 pb-2">
+      <h2 id="modal-title" class="font-headline font-bold text-lg text-on-surface"></h2>
+      <button class="text-on-surface-variant hover:text-on-surface p-1 rounded-full" onclick="Modal.close()">
+        <span class="material-symbols-rounded">close</span>
+      </button>
     </div>
-    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-body" class="px-6 pb-8"></div>
   </div>
 </div>
 
-<!-- html5-qrcode は使用時に遅延ロード -->
-<div id="__temp_scan__" style="display:none;"></div>
+<!-- ═══ Toast Container ═══ -->
+<div id="toast-container" class="fixed bottom-28 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center gap-2"></div>
 
-<div id="toast-container"></div>
-
-<!-- QRCode.js（緊急カード用） -->
+<!-- ═══ Scripts ═══ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
   integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSe2HkjGVMFbO3sAMbFPEECZCM9Pi0Kx4O7g=="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-<!-- App modules -->
 <script src="db.js"></script>
 <script src="app.js"></script>
 <script src="vision.js"></script>
@@ -141,13 +239,14 @@
 <script src="settings.js"></script>
 
 <script>
-  (async () => {
-    await DB.init();
-    App.init();
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(()=>{});
-    }
-  })();
+(async () => {
+  await DB.init();
+  App.init();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+})();
 </script>
+
 </body>
 </html>
