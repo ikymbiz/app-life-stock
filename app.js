@@ -13,7 +13,6 @@ const Modal = (() => {
     onClose = closeCb;
     bg.classList.remove('hidden');
     requestAnimationFrame(() => bg.classList.add('visible'));
-    // Scroll to top
     body.scrollTop = 0;
   }
 
@@ -77,34 +76,15 @@ const Utils = {
     if (d === null) return '';
     if (d < 0)   return `期限切れ ${Math.abs(d)}日`;
     if (d === 0) return '本日期限';
-    if (d < 90)  return `残${d}日`;
     return `残${d}日`;
   },
 
   categoryIcon(cat) {
-    const map = {
-      water:     '💧',
-      food:      '🍱',
-      medicine:  '💊',
-      sanitation:'🧴',
-      disaster:  '🔦',
-      pet:       '🐾',
-      other:     '📦',
-    };
-    return map[cat] || '📦';
+    return {water:'💧',food:'🍱',medicine:'💊',sanitation:'🧴',disaster:'🔦',pet:'🐾',other:'📦'}[cat] || '📦';
   },
 
   categoryLabel(cat) {
-    const map = {
-      water:     '水',
-      food:      '食料',
-      medicine:  '医薬品',
-      sanitation:'衛生用品',
-      disaster:  '防災グッズ',
-      pet:       'ペット用品',
-      other:     'その他',
-    };
-    return map[cat] || cat;
+    return {water:'水',food:'食料',medicine:'医薬品',sanitation:'衛生用品',disaster:'防災グッズ',pet:'ペット用品',other:'その他'}[cat] || cat;
   },
 
   escape(str) {
@@ -113,15 +93,14 @@ const Utils = {
     return d.innerHTML;
   },
 
-  // Auto-detect expiry date pattern from OCR text
   detectExpiryDate(text) {
     const patterns = [
-      /(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/,  // 2024/12/31
-      /(\d{2})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/,  // 24/12/31
-      /(\d{4})年(\d{1,2})月(\d{1,2})日/,             // 2024年12月31日
-      /(\d{2})年(\d{1,2})月(\d{1,2})日/,             // 24年12月31日
-      /(\d{4})\.(\d{2})/,                            // 2024.12
-      /(\d{2})\.(\d{2})/,                            // 24.12
+      /(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/,
+      /(\d{2})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/,
+      /(\d{4})年(\d{1,2})月(\d{1,2})日/,
+      /(\d{2})年(\d{1,2})月(\d{1,2})日/,
+      /(\d{4})\.(\d{2})/,
+      /(\d{2})\.(\d{2})/,
     ];
     for (const p of patterns) {
       const m = text.match(p);
@@ -150,24 +129,16 @@ const App = (() => {
 
   function navigate(page) {
     if (!pages[page]) return;
-    // Hide all pages
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-    // Show target
     const el = document.getElementById(`page-${page}`);
-    if (el) {
-      el.classList.add('active');
-      el.innerHTML = ''; // clear old content
-    }
+    if (el) { el.classList.add('active'); el.innerHTML = ''; }
 
-    // Activate nav item
     const navEl = document.querySelector(`.nav-item[data-page="${page}"]`);
     if (navEl) navEl.classList.add('active');
 
     currentPage = page;
-
-    // Render page
     const mod = pages[page].module();
     if (mod && mod.render) mod.render();
   }
@@ -178,44 +149,34 @@ const App = (() => {
       btn.addEventListener('click', () => navigate(btn.dataset.page));
     });
 
-    // ＋ ボタン: 登録方法選択シートを表示
+    // Add item center button — 変更点: 登録方法選択シートを表示
     document.querySelectorAll('.nav-item[data-action="add-item"]').forEach(btn => {
       btn.addEventListener('click', () => {
         if (currentPage === 'profiles') {
           ProfilesPage.openAddModal();
         } else if (currentPage === 'shopping') {
           ShoppingPage.openAddModal();
+        } else if (currentPage === 'inventory') {
+          InventoryPage.showAddMethodSheet();
         } else {
-          // 備蓄品: 登録方法選択（撮るだけ / バーコード / 手動）
-          if (currentPage !== 'inventory') {
-            navigate('inventory');
-            setTimeout(() => InventoryPage.showAddMethodSheet(), 300);
-          } else {
-            InventoryPage.showAddMethodSheet();
-          }
+          navigate('inventory');
+          setTimeout(() => InventoryPage.showAddMethodSheet(), 300);
         }
       });
     });
 
-    // Initial page
     navigate('dashboard');
   }
 
   async function showEmergencyCard() {
     const profiles = await DB.Profiles.getAll();
-    if (!profiles.length) {
-      Toast.show('健康カードが登録されていません', 'error');
-      return;
-    }
-
+    if (!profiles.length) { Toast.show('健康カードが登録されていません', 'error'); return; }
     let html = `<p style="color:var(--txt-3);font-size:13px;margin-bottom:12px;">
       救急隊員に提示する緊急医療情報を選択してください</p>
       <div style="display:flex;flex-direction:column;gap:8px;">`;
-
     for (const p of profiles) {
       html += `<button class="btn btn-secondary" onclick="App.showQR(${p.id})">
-        ${p.is_pet ? '🐾' : '👤'} ${Utils.escape(p.owner_name)} の緊急カードを表示
-      </button>`;
+        ${p.is_pet ? '🐾' : '👤'} ${Utils.escape(p.owner_name)} の緊急カードを表示</button>`;
     }
     html += '</div>';
     Modal.open('🆘 緊急カード選択', html);

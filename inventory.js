@@ -1,10 +1,11 @@
-/* inventory.js — Inventory: Barcode + Vision AI + multi-stock + photo gallery */
+/* inventory.js — Inventory: Quick Add + simplified form */
 const InventoryPage = (() => {
   let allItems            = [];
   let activeFilter        = 'all';
   let currentStockEntries = [];
   let currentItemImages   = [];
   let allergenWarningMap  = new Map();
+  let _quickState         = {};
 
   const CATEGORIES = [
     {id:'all',label:'すべて'},{id:'water',label:'💧 水'},{id:'food',label:'🍱 食料'},
@@ -15,10 +16,10 @@ const InventoryPage = (() => {
   const LOCATIONS = ['玄関','キッチン','食品庫','寝室','リビング','クローゼット','床下収納','車内','ベランダ','その他'];
 
   const ALLERGEN_LIST = [
-    {id:'小麦',  label:'🌾 小麦',  major:true},{id:'卵',    label:'🥚 卵',    major:true},
-    {id:'乳',    label:'🥛 乳',    major:true},{id:'そば',  label:'🍜 そば',  major:true},
-    {id:'落花生',label:'🥜 落花生',major:true},{id:'えび',  label:'🦐 えび',  major:true},
-    {id:'かに',  label:'🦀 かに',  major:true},{id:'くるみ',label:'🌰 くるみ',major:true},
+    {id:'小麦',label:'🌾 小麦',major:true},{id:'卵',label:'🥚 卵',major:true},
+    {id:'乳',label:'🥛 乳',major:true},{id:'そば',label:'🍜 そば',major:true},
+    {id:'落花生',label:'🥜 落花生',major:true},{id:'えび',label:'🦐 えび',major:true},
+    {id:'かに',label:'🦀 かに',major:true},{id:'くるみ',label:'🌰 くるみ',major:true},
     {id:'アーモンド',label:'アーモンド'},{id:'あわび',label:'あわび'},{id:'いか',label:'いか'},
     {id:'いくら',label:'いくら'},{id:'オレンジ',label:'🍊 オレンジ'},
     {id:'カシューナッツ',label:'カシューナッツ'},{id:'キウイ',label:'🥝 キウイ'},
@@ -82,27 +83,24 @@ const InventoryPage = (() => {
       filtered = filtered.filter(i => (i.name||'').toLowerCase().includes(q)||(i.location||'').toLowerCase().includes(q));
     }
     filtered.sort((a,b) => {
-      const aw = allergenWarningMap.has(b.id) ? 1 : allergenWarningMap.has(a.id) ? -1 : 0;
-      if (aw !== 0) return aw;
+      const aw = allergenWarningMap.has(b.id)?1:allergenWarningMap.has(a.id)?-1:0;
+      if (aw!==0) return aw;
       const da = a.nearest_expiry ? Utils.daysUntil(a.nearest_expiry) : 9999;
       const db = b.nearest_expiry ? Utils.daysUntil(b.nearest_expiry) : 9999;
       return da - db;
     });
     if (!filtered.length) {
-      listEl.innerHTML = `<div class="empty-state">
-        <div class="empty-icon">📦</div>
+      listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div>
         <div class="empty-title">備蓄品がありません</div>
-        <div class="empty-sub">右下の ＋ ボタンから追加してください</div>
-      </div>`; return;
+        <div class="empty-sub">右下の ＋ ボタンから追加してください</div></div>`; return;
     }
     listEl.innerHTML = filtered.map(item => {
-      const warnings = allergenWarningMap.get(item.id) || [];
-      const exClass  = item.nearest_expiry ? Utils.expiryClass(item.nearest_expiry) : 'expiry-none';
-      const exLabel  = item.nearest_expiry ? Utils.expiryLabel(item.nearest_expiry) : '';
-      const isLow    = item.min_qty > 0 && item.total_qty < item.min_qty;
-      const lotTag   = item.is_rolling && (item.stocks||[]).length > 1
-        ? `<span class="expiry-badge expiry-warn">🔄${item.stocks.length}ロット</span>` : '';
-      const warnTag  = warnings.length ? `<span class="allergen-badge">⚠️ アレルギー</span>` : '';
+      const warnings = allergenWarningMap.get(item.id)||[];
+      const exClass = item.nearest_expiry ? Utils.expiryClass(item.nearest_expiry) : 'expiry-none';
+      const exLabel = item.nearest_expiry ? Utils.expiryLabel(item.nearest_expiry) : '';
+      const isLow   = item.min_qty > 0 && item.total_qty < item.min_qty;
+      const lotTag  = item.is_rolling&&(item.stocks||[]).length>1 ? `<span class="expiry-badge expiry-warn">🔄${item.stocks.length}ロット</span>` : '';
+      const warnTag = warnings.length ? '<span class="allergen-badge">⚠️ アレルギー</span>' : '';
       return `<div class="item-card ${isLow?'item-low-stock':''} ${warnings.length?'item-allergen-warn':''}"
           onclick="InventoryPage.openEditModal(${item.id})">
         <div class="item-card-inner">
@@ -114,16 +112,16 @@ const InventoryPage = (() => {
               ${item.location&&item.nearest_expiry?' · ':''}
               ${item.nearest_expiry?`期限:${Utils.formatDate(item.nearest_expiry)}`:''}
             </div>
-            ${warnings.length ? `<div class="allergen-who">
+            ${warnings.length?`<div class="allergen-who">
               ${[...new Set(warnings.map(w=>w.who))].map(n=>`<span class="allergen-who-badge">${Utils.escape(n)}</span>`).join('')}
               ${[...new Set(warnings.map(w=>w.allergen))].map(a=>`<span class="allergen-item-badge">${Utils.escape(a)}</span>`).join('')}
-            </div>` : ''}
+            </div>`:''}
           </div>
           <div class="item-right">
             <div class="item-qty">${item.total_qty}<span style="font-size:12px;color:var(--txt-3);"> ${Utils.escape(item.unit||'個')}</span></div>
             ${item.nearest_expiry?`<span class="expiry-badge ${exClass}">${exLabel}</span>`:''}
             ${lotTag}${warnTag}
-            ${isLow?`<span class="expiry-badge expiry-warn">在庫不足</span>`:''}
+            ${isLow?'<span class="expiry-badge expiry-warn">在庫不足</span>':''}
           </div>
         </div>
       </div>`;
@@ -132,51 +130,197 @@ const InventoryPage = (() => {
 
   function setFilter(cat) { activeFilter = cat; render(); }
 
-  // ── 画像圧縮 ──
+  // ═══════════════════════════════════
+  //  📸 クイック登録フロー
+  // ═══════════════════════════════════
+
+  async function showAddMethodSheet() {
+    const provider = await DB.Settings.get('ai_provider', 'none');
+    const apiKey   = provider!=='none' ? await DB.Settings.get('ai_key_'+provider, '') : '';
+    const aiReady  = provider!=='none' && !!apiKey;
+
+    let h = '<div style="display:flex;flex-direction:column;gap:10px;">';
+
+    if (aiReady) {
+      h += `<button type="button" onclick="InventoryPage.startQuickCapture()" style="
+        display:flex;align-items:center;gap:14px;padding:18px 16px;border-radius:var(--radius-sm);
+        background:var(--green-dim);border:1.5px solid var(--green-border);cursor:pointer;text-align:left;">
+        <span style="font-size:32px;">📸</span>
+        <div><div style="font-weight:700;font-size:16px;color:var(--green);">撮るだけ登録</div>
+        <div style="font-size:12px;color:var(--txt-3);margin-top:2px;">写真を撮るだけでAIが自動入力</div></div></button>`;
+    } else {
+      h += `<div style="padding:14px 16px;border-radius:var(--radius-sm);background:var(--bg-3);border:1px dashed var(--border-med);text-align:center;">
+        <div style="font-size:13px;color:var(--txt-3);margin-bottom:8px;">📸 撮るだけ登録を使うにはAI設定が必要です</div>
+        <button class="btn btn-secondary btn-sm" onclick="Modal.close();App.navigate('settings');">⚙️ AI設定へ</button></div>`;
+    }
+
+    h += `<button type="button" onclick="Modal.close();setTimeout(function(){InventoryPage.openAddModal();},300);" style="
+      display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:var(--radius-sm);
+      background:var(--bg-2);border:1px solid var(--border);cursor:pointer;text-align:left;">
+      <span style="font-size:24px;">✏️</span>
+      <div><div style="font-weight:700;font-size:14px;color:var(--txt-1);">手動入力</div>
+      <div style="font-size:11px;color:var(--txt-3);">すべての項目を自分で入力</div></div></button>`;
+
+    h += '</div>';
+    Modal.open('➕ 備蓄品を追加', h);
+  }
+
+  function startQuickCapture() {
+    Modal.close();
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      await processQuickCapture(file);
+    };
+    setTimeout(() => input.click(), 350);
+  }
+
+  async function processQuickCapture(file) {
+    Modal.open('📸 撮るだけ登録', `<div style="text-align:center;padding:32px 0;">
+      <div style="font-size:48px;margin-bottom:16px;animation:pulse 1.2s infinite;">🤖</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px;">AI解析中...</div>
+      <div style="font-size:12px;color:var(--txt-3);">写真から備蓄品情報を読み取っています</div></div>`);
+    try {
+      const [aiImg, storageImg] = await Promise.all([VisionAI.compressForAI(file), VisionAI.compressForStorage(file)]);
+      if (!aiImg || !storageImg) { Toast.error('画像の読み込みに失敗'); Modal.close(); return; }
+      const result = await VisionAI.analyze(aiImg, 'quick');
+      showQuickConfirm(result, storageImg);
+    } catch(e) {
+      Modal.close();
+      if (e.message==='NO_PROVIDER') { Toast.show('⚙️ AI設定が必要です'); App.navigate('settings'); }
+      else if (e.message==='NO_KEY') { Toast.error('APIキーが未設定です'); }
+      else { Toast.error('AI解析エラー: '+e.message); }
+    }
+  }
+
+  function showQuickConfirm(result, storageImg) {
+    const name = result.name||'', category = result.category||'other', expiry = result.expiry_date||'';
+    const allergens = result.allergens||[], unit = result.unit||'個', qty = result.qty||1;
+    _quickState = { storageImg, allergens };
+
+    const catLabel = c => ({water:'💧 水',food:'🍱 食料',medicine:'💊 医薬品',sanitation:'🧴 衛生',disaster:'🔦 防災',pet:'🐾 ペット',other:'📦 その他'}[c]||'📦 その他');
+
+    let h = `<div style="margin-bottom:12px;">
+      <img src="${storageImg}" style="width:100%;max-height:180px;object-fit:cover;border-radius:var(--radius-sm);border:1px solid var(--border);"></div>`;
+
+    h += `<div class="form-group"><label class="form-label">品名 *</label>
+      <input id="qf-name" class="form-input" value="${Utils.escape(name)}" placeholder="品名を入力"></div>`;
+
+    h += '<div class="form-row">';
+    h += `<div class="form-group"><label class="form-label">カテゴリー</label><select id="qf-category" class="form-select">
+      ${['water','food','medicine','sanitation','disaster','pet','other'].map(c=>`<option value="${c}" ${category===c?'selected':''}>${catLabel(c)}</option>`).join('')}</select></div>`;
+    h += `<div class="form-group"><label class="form-label">単位</label><select id="qf-unit" class="form-select">
+      ${UNITS.map(u=>`<option ${unit===u?'selected':''}>${u}</option>`).join('')}</select></div>`;
+    h += '</div>';
+
+    h += '<div class="form-row">';
+    h += `<div class="form-group"><label class="form-label">数量</label>
+      <input id="qf-qty" type="number" class="form-input" value="${qty}" min="0.5" step="0.5"></div>`;
+    h += `<div class="form-group"><label class="form-label">賞味期限</label>
+      <input id="qf-expiry" type="date" class="form-input" value="${expiry}">
+      ${expiry ? `<div style="margin-top:3px;font-size:11px;" class="${Utils.expiryClass(expiry)}">${Utils.expiryLabel(expiry)}</div>` : ''}</div>`;
+    h += '</div>';
+
+    h += `<div class="form-group"><label class="form-label">保管場所</label><select id="qf-location" class="form-select">
+      <option value="">選択...</option>${LOCATIONS.map(l=>`<option>${l}</option>`).join('')}</select></div>`;
+
+    if (allergens.length) {
+      h += `<div class="form-group"><label class="form-label">⚠️ 検出アレルゲン</label>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;">
+        ${allergens.map(a=>`<span style="font-size:12px;padding:3px 8px;border-radius:4px;background:var(--red-dim);border:1px solid var(--red-border);color:var(--red);">${Utils.escape(a)}</span>`).join('')}</div></div>`;
+    }
+
+    h += `<div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn btn-primary" style="flex:2;" onclick="InventoryPage.saveQuickItem()">✅ 登録する</button>
+      <button class="btn btn-secondary" style="flex:1;" onclick="InventoryPage.quickToFull()">✏️ 詳細編集</button></div>`;
+    h += `<button class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="InventoryPage.startQuickCapture()">📸 もう1枚撮影</button>`;
+
+    Modal.open('📸 撮るだけ登録', h);
+  }
+
+  async function saveQuickItem() {
+    const nameEl = document.getElementById('qf-name');
+    if (!nameEl || !nameEl.value.trim()) { Toast.error('品名を入力してください'); return; }
+    const data = {
+      name: nameEl.value.trim(),
+      category: document.getElementById('qf-category')?.value || 'other',
+      location: document.getElementById('qf-location')?.value || '',
+      unit: document.getElementById('qf-unit')?.value || '個',
+      min_qty:0, is_rolling:false, is_emergency:false,
+      allergens: (_quickState.allergens||[]).join(','), notes: '',
+    };
+    const qty    = parseFloat(document.getElementById('qf-qty')?.value)||1;
+    const expiry = document.getElementById('qf-expiry')?.value||'';
+    const itemId = await DB.Items.add(data);
+    await DB.ItemStocks.replaceForItem(itemId, [{id:null, qty, expiry_date:expiry, note:''}]);
+    if (_quickState.storageImg) await DB.ItemImages.add({item_id:itemId, image:_quickState.storageImg, caption:'package', sort_order:0});
+    Toast.success('✅ 登録しました');
+    Modal.close(); _quickState = {};
+    allItems = await DB.Items.getAll(); await buildAllergenWarnings(allItems); render();
+  }
+
+  function quickToFull() {
+    const name = document.getElementById('qf-name')?.value||'';
+    const category = document.getElementById('qf-category')?.value||'other';
+    const unit = document.getElementById('qf-unit')?.value||'個';
+    const qty = parseFloat(document.getElementById('qf-qty')?.value)||1;
+    const expiry = document.getElementById('qf-expiry')?.value||'';
+    const location = document.getElementById('qf-location')?.value||'';
+    const allergens = _quickState.allergens||[];
+    const storageImg = _quickState.storageImg;
+    Modal.close(); _quickState = {};
+    setTimeout(() => {
+      currentStockEntries = [{id:null, qty, expiry_date:expiry, note:''}];
+      currentItemImages = storageImg ? [{id:null, base64:storageImg, caption:'package', isNew:true, toDelete:false}] : [];
+      Modal.open('➕ 備蓄品を追加', itemFormHTML(null));
+      setTimeout(() => {
+        const ne=document.getElementById('f-name'); if(ne&&name) ne.value=name;
+        const ce=document.getElementById('f-category'); if(ce) ce.value=category;
+        const ue=document.getElementById('f-unit'); if(ue) ue.value=unit;
+        const le=document.getElementById('f-location'); if(le) le.value=location;
+        if (allergens.length) { setSelectedAllergens(allergens); renderAllergenUI(allergens); }
+        renderStockEntries(); renderPhotos();
+      }, 80);
+    }, 300);
+  }
+
+  // ═══════════════════════════════════
+  //  既存機能
+  // ═══════════════════════════════════
+
   function compressImage(file, maxW=900, quality=0.72) {
     return new Promise(resolve => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
+      const img = new Image(); const url = URL.createObjectURL(file);
       img.onload = () => {
-        let w=img.width, h=img.height;
-        if (w>maxW||h>maxW) { if(w>h){h=Math.round(h*maxW/w);w=maxW;}else{w=Math.round(w*maxW/h);h=maxW;} }
-        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        let w=img.width,h=img.height;
+        if(w>maxW||h>maxW){if(w>h){h=Math.round(h*maxW/w);w=maxW;}else{w=Math.round(w*maxW/h);h=maxW;}}
+        const c=document.createElement('canvas');c.width=w;c.height=h;
         c.getContext('2d').drawImage(img,0,0,w,h);
-        URL.revokeObjectURL(url); resolve(c.toDataURL('image/jpeg',quality));
+        URL.revokeObjectURL(url);resolve(c.toDataURL('image/jpeg',quality));
       };
-      img.onerror=()=>{URL.revokeObjectURL(url);resolve(null);};
-      img.src=url;
+      img.onerror=()=>{URL.revokeObjectURL(url);resolve(null);}; img.src=url;
     });
   }
 
-  // ── 写真UI ──
   function renderPhotos() {
-    const el = document.getElementById('photo-gallery');
-    if (!el) return;
+    const el = document.getElementById('photo-gallery'); if (!el) return;
     const visible = currentItemImages.filter(i=>!i.toDelete);
-    if (!visible.length) {
-      el.innerHTML=`<div style="color:var(--txt-3);font-size:12px;padding:4px 0;">写真なし</div>`; return;
-    }
-    el.innerHTML = visible.map((img,i)=>`
-      <div class="photo-thumb-wrap">
-        <img class="photo-thumb" src="${img.base64}" alt="${img.caption}">
-        <div class="photo-caption">${captionLabel(img.caption)}</div>
-        <button class="photo-delete-btn" onclick="InventoryPage.removePhoto(${i})">✕</button>
-      </div>`).join('');
-  }
-  function captionLabel(c) {
-    return {package:'📦パッケージ',ingredients:'📋成分表',storage:'📍保管場所',other:'📸その他'}[c]||'📸';
+    if (!visible.length) { el.innerHTML='<div style="color:var(--txt-3);font-size:12px;padding:4px 0;">写真なし</div>'; return; }
+    el.innerHTML = visible.map((img,i)=>`<div class="photo-thumb-wrap">
+      <img class="photo-thumb" src="${img.base64}" alt="${img.caption}">
+      <div class="photo-caption">${({package:'📦',ingredients:'📋',storage:'📍',other:'📸'}[img.caption])||'📸'}</div>
+      <button class="photo-delete-btn" onclick="InventoryPage.removePhoto(${i})">✕</button></div>`).join('');
   }
   async function addPhoto(captionType) {
-    const input=document.createElement('input');
-    input.type='file'; input.accept='image/*'; input.capture='environment';
+    const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.capture='environment';
     input.onchange=async e=>{
       const file=e.target.files[0]; if(!file) return;
       const b64=await compressImage(file); if(!b64){Toast.error('画像読込失敗');return;}
       currentItemImages.push({id:null,base64:b64,caption:captionType,isNew:true,toDelete:false});
       renderPhotos(); Toast.success('📸 写真を追加しました');
-    };
-    input.click();
+    }; input.click();
   }
   function removePhoto(idx) {
     const visible=currentItemImages.filter(i=>!i.toDelete);
@@ -185,80 +329,48 @@ const InventoryPage = (() => {
     renderPhotos();
   }
 
-  // ── Vision AI スキャン ──
+  // ── Vision AI（フォーム内から使う用） ──
   async function triggerVisionScan(type) {
     const provider = await DB.Settings.get('ai_provider','none');
-    if (provider === 'none') {
-      Toast.show('⚙️ 設定画面でAIプロバイダーとAPIキーを設定してください');
-      App.navigate('settings');
-      return;
-    }
-    const input=document.createElement('input');
-    input.type='file'; input.accept='image/*'; input.capture='environment';
+    if (provider==='none') { Toast.show('⚙️ 設定でAIを有効にしてください'); App.navigate('settings'); return; }
+    const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.capture='environment';
     input.onchange=async e=>{
       const file=e.target.files[0]; if(!file) return;
-      const b64=await compressImage(file); if(!b64) return;
-      // 写真を自動で追加
-      const cap=type==='allergens'?'ingredients':'package';
-      currentItemImages.push({id:null,base64:b64,caption:cap,isNew:true,toDelete:false});
+      const [aiB64,stB64]=await Promise.all([VisionAI.compressForAI(file),VisionAI.compressForStorage(file)]);
+      if(!aiB64||!stB64) return;
+      currentItemImages.push({id:null,base64:stB64,caption:type==='allergens'?'ingredients':'package',isNew:true,toDelete:false});
       renderPhotos();
-      await runVisionAI(b64, type);
-    };
-    input.click();
-  }
-
-  async function runVisionAI(base64, type) {
-    const indicator = document.getElementById('vision-indicator');
-    if (indicator) { indicator.style.display='block'; indicator.textContent='🤖 AI解析中...'; }
-
-    try {
-      const result = await VisionAI.analyze(`data:image/jpeg;base64,${base64}`, type);
-      applyVisionResult(result, type);
-    } catch(e) {
-      if (e.message==='NO_PROVIDER') {
-        Toast.show('⚙️ 設定画面でAIプロバイダーを設定してください');
-      } else if (e.message==='NO_KEY') {
-        Toast.error('APIキーが設定されていません');
-      } else {
-        Toast.error(`AI解析エラー: ${e.message}`);
-      }
-    } finally {
-      if (indicator) indicator.style.display='none';
-    }
+      const ind=document.getElementById('vision-indicator');
+      if(ind){ind.style.display='block';ind.textContent='🤖 AI解析中...';}
+      try { applyVisionResult(await VisionAI.analyze(aiB64,type), type); }
+      catch(e){ Toast.error('AI解析エラー: '+e.message); }
+      finally { if(ind) ind.style.display='none'; }
+    }; input.click();
   }
 
   function applyVisionResult(result, type) {
     let found = false;
-    // 賞味期限
-    if (result.expiry_date && type !== 'allergens') {
+    if (result.expiry_date && type!=='allergens') {
       let filled=false;
       for(let i=0;i<currentStockEntries.length;i++){
         if(!currentStockEntries[i].expiry_date){
           currentStockEntries[i].expiry_date=result.expiry_date;
-          const el=document.getElementById(`se-expiry-${i}`);
-          if(el) el.value=result.expiry_date;
+          const el=document.getElementById('se-expiry-'+i); if(el) el.value=result.expiry_date;
           filled=true; break;
         }
       }
       if(!filled) currentStockEntries.push({id:null,qty:1,expiry_date:result.expiry_date,note:''});
       renderStockEntries();
-      Toast.success(`📅 賞味期限: ${Utils.formatDate(result.expiry_date)}`);
-      found=true;
+      Toast.success('📅 賞味期限: '+Utils.formatDate(result.expiry_date)); found=true;
     }
-    // アレルゲン
-    if (result.allergens && result.allergens.length) {
-      const current = getSelectedAllergens();
-      const merged  = [...new Set([...current, ...result.allergens])];
-      setSelectedAllergens(merged);
-      renderAllergenUI(merged);
-      Toast.success(`⚠️ アレルゲン: ${result.allergens.join('・')}`);
-      found=true;
+    if (result.allergens&&result.allergens.length) {
+      const merged=[...new Set([...getSelectedAllergens(),...result.allergens])];
+      setSelectedAllergens(merged); renderAllergenUI(merged);
+      Toast.success('⚠️ アレルゲン: '+result.allergens.join('・')); found=true;
     }
-    // 商品名
-    if (result.name) {
-      const nameEl=document.getElementById('f-name');
-      if(nameEl && !nameEl.value.trim()){ nameEl.value=result.name; Toast.success(`📦 品名: ${result.name}`); found=true; }
-    }
+    if (result.name) { const ne=document.getElementById('f-name'); if(ne&&!ne.value.trim()){ne.value=result.name;found=true;} }
+    if (result.category) { const ce=document.getElementById('f-category'); if(ce) ce.value=result.category; }
+    if (result.unit) { const ue=document.getElementById('f-unit'); if(ue) ue.value=result.unit; }
     if(!found) Toast.show('テキストを検出できませんでした');
   }
 
@@ -267,15 +379,11 @@ const InventoryPage = (() => {
     const h=document.getElementById('f-allergens-hidden');
     return h&&h.value ? h.value.split(',').map(a=>a.trim()).filter(Boolean) : [];
   }
-  function setSelectedAllergens(arr) {
-    const h=document.getElementById('f-allergens-hidden');
-    if(h) h.value=arr.join(',');
-  }
+  function setSelectedAllergens(arr) { const h=document.getElementById('f-allergens-hidden'); if(h) h.value=arr.join(','); }
   function toggleAllergen(id) {
     let sel=getSelectedAllergens();
-    sel=sel.includes(id) ? sel.filter(a=>a!==id) : [...sel,id];
-    setSelectedAllergens(sel);
-    renderAllergenUI(sel);
+    sel=sel.includes(id)?sel.filter(a=>a!==id):[...sel,id];
+    setSelectedAllergens(sel); renderAllergenUI(sel);
   }
   function renderAllergenUI(selected) {
     const chips=document.getElementById('allergen-selected-chips');
@@ -283,44 +391,30 @@ const InventoryPage = (() => {
       ? selected.map(a=>`<span class="allergen-chip-selected" onclick="InventoryPage.toggleAllergen('${a}')">${a} ✕</span>`).join('')
       : '<span style="color:var(--txt-3);font-size:12px;">なし</span>';
     document.querySelectorAll('.allergen-toggle-btn').forEach(btn=>{
-      btn.classList.toggle('active', selected.includes(btn.dataset.id));
+      btn.classList.toggle('active',selected.includes(btn.dataset.id));
     });
   }
 
   // ── Stock entries ──
   function renderStockEntries() {
-    const el=document.getElementById('stock-entries-list');
-    if(!el) return;
-    if(!currentStockEntries.length){
-      el.innerHTML=`<div style="color:var(--txt-3);font-size:12px;padding:4px 0;">＋ エントリーを追加</div>`; return;
-    }
-    el.innerHTML=currentStockEntries.map((entry,idx)=>`
-      <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:8px;">
-        <div style="flex:1;">
-          <div style="display:flex;gap:6px;align-items:center;">
-            <input type="number" id="se-qty-${idx}" value="${entry.qty||''}" min="0.5" step="0.5"
-              class="form-input" style="width:80px;" placeholder="数量"
-              oninput="InventoryPage.syncStock(${idx},'qty',this.value)">
-            <input type="date" id="se-expiry-${idx}" value="${entry.expiry_date||''}"
-              class="form-input" style="flex:1;"
-              oninput="InventoryPage.syncStock(${idx},'expiry_date',this.value)">
-          </div>
-          ${entry.expiry_date?`<div style="margin-top:3px;font-size:11px;" class="${Utils.expiryClass(entry.expiry_date)}">${Utils.expiryLabel(entry.expiry_date)}</div>`:''}
-        </div>
-        <button type="button" onclick="InventoryPage.removeStockEntry(${idx})"
-          style="flex-shrink:0;background:var(--red-dim);border:1px solid var(--red-border);color:var(--red);
-          border-radius:6px;padding:7px 10px;cursor:pointer;font-size:13px;margin-top:2px;">✕</button>
-      </div>`).join('');
+    const el=document.getElementById('stock-entries-list'); if(!el) return;
+    if(!currentStockEntries.length){ el.innerHTML='<div style="color:var(--txt-3);font-size:12px;padding:4px 0;">＋ エントリーを追加</div>'; return; }
+    el.innerHTML=currentStockEntries.map((entry,idx)=>`<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:8px;">
+      <div style="flex:1;"><div style="display:flex;gap:6px;align-items:center;">
+        <input type="number" id="se-qty-${idx}" value="${entry.qty||''}" min="0.5" step="0.5" class="form-input" style="width:80px;" placeholder="数量" oninput="InventoryPage.syncStock(${idx},'qty',this.value)">
+        <input type="date" id="se-expiry-${idx}" value="${entry.expiry_date||''}" class="form-input" style="flex:1;" oninput="InventoryPage.syncStock(${idx},'expiry_date',this.value)">
+      </div>${entry.expiry_date?`<div style="margin-top:3px;font-size:11px;" class="${Utils.expiryClass(entry.expiry_date)}">${Utils.expiryLabel(entry.expiry_date)}</div>`:''}</div>
+      <button type="button" onclick="InventoryPage.removeStockEntry(${idx})" style="flex-shrink:0;background:var(--red-dim);border:1px solid var(--red-border);color:var(--red);border-radius:6px;padding:7px 10px;cursor:pointer;font-size:13px;margin-top:2px;">✕</button>
+    </div>`).join('');
   }
-  function syncStock(idx,field,val){
-    if(!currentStockEntries[idx]) return;
-    currentStockEntries[idx][field]=field==='qty'?parseFloat(val)||0:val;
-    if(field==='expiry_date') setTimeout(()=>renderStockEntries(),30);
-  }
+  function syncStock(idx,field,val){ if(!currentStockEntries[idx]) return; currentStockEntries[idx][field]=field==='qty'?parseFloat(val)||0:val; if(field==='expiry_date') setTimeout(()=>renderStockEntries(),30); }
   function addStockEntry(){currentStockEntries.push({id:null,qty:1,expiry_date:'',note:''});renderStockEntries();}
   function removeStockEntry(idx){currentStockEntries.splice(idx,1);renderStockEntries();}
 
-  // ── Item Form ──
+  // ══════════════════════════════════════════
+  //  簡素化したフォーム（スキャンボタン削除）
+  // ══════════════════════════════════════════
+
   function itemFormHTML(item=null) {
     const edit=!!item;
     const v=(f,def='')=>edit&&item[f]!=null?Utils.escape(String(item[f])):def;
@@ -328,99 +422,61 @@ const InventoryPage = (() => {
     const existing=item?.allergens?item.allergens.split(',').map(a=>a.trim()).filter(Boolean):[];
 
     return `
-    <!-- ① バーコード・AIスキャン -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-      <button type="button" class="scan-btn-primary" onclick="BarcodeScanner.scanAndFill()">
-        <span style="font-size:20px;">📱</span>
-        <span style="font-size:13px;font-weight:700;">バーコードスキャン</span>
-        <span style="font-size:10px;opacity:.75;">商品名・アレルゲン自動入力</span>
-      </button>
-      <button type="button" class="scan-btn-ai" onclick="InventoryPage.triggerVisionScan('full')">
-        <span style="font-size:20px;">🤖</span>
-        <span style="font-size:13px;font-weight:700;">AI写真解析</span>
-        <span style="font-size:10px;opacity:.75;">賞味期限・アレルゲン読取</span>
-      </button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
-      <button type="button" class="scan-btn-sub" onclick="InventoryPage.triggerVisionScan('expiry')">
-        📅 賞味期限のみ読取
-      </button>
-      <button type="button" class="scan-btn-sub" onclick="InventoryPage.triggerVisionScan('allergens')">
-        ⚠️ 成分表・アレルゲンのみ
+    <!-- AI読取ボタン（1つだけ） -->
+    <div style="margin-bottom:14px;">
+      <button type="button" class="scan-btn-ai" style="width:100%;" onclick="InventoryPage.triggerVisionScan('full')">
+        <span style="font-size:18px;">🤖</span>
+        <span style="font-size:13px;font-weight:700;">AI写真解析で自動入力</span>
       </button>
     </div>
     <div id="vision-indicator" style="display:none;text-align:center;padding:8px;
       background:var(--blue-dim);border-radius:8px;font-size:13px;color:var(--blue);margin-bottom:10px;"></div>
 
-    <!-- ② 品名 -->
+    <!-- 品名 -->
     <div class="form-group">
       <label class="form-label">品名 *</label>
       <input id="f-name" class="form-input" value="${v('name')}" placeholder="例: ミネラルウォーター 2L">
     </div>
 
     <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">カテゴリー</label>
+      <div class="form-group"><label class="form-label">カテゴリー</label>
         <select id="f-category" class="form-select">
-          <option value="water"      ${item?.category==='water'?'selected':''}>💧 水</option>
-          <option value="food"       ${item?.category==='food'?'selected':''}>🍱 食料</option>
-          <option value="medicine"   ${item?.category==='medicine'?'selected':''}>💊 医薬品</option>
+          <option value="water" ${item?.category==='water'?'selected':''}>💧 水</option>
+          <option value="food" ${item?.category==='food'?'selected':''}>🍱 食料</option>
+          <option value="medicine" ${item?.category==='medicine'?'selected':''}>💊 医薬品</option>
           <option value="sanitation" ${item?.category==='sanitation'?'selected':''}>🧴 衛生用品</option>
-          <option value="disaster"   ${item?.category==='disaster'?'selected':''}>🔦 防災グッズ</option>
-          <option value="pet"        ${item?.category==='pet'?'selected':''}>🐾 ペット用品</option>
-          <option value="other"      ${item?.category==='other'?'selected':''}>📦 その他</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">単位</label>
-        <select id="f-unit" class="form-select">
-          ${UNITS.map(u=>`<option ${unitVal===u?'selected':''}>${u}</option>`).join('')}
-        </select>
-      </div>
+          <option value="disaster" ${item?.category==='disaster'?'selected':''}>🔦 防災グッズ</option>
+          <option value="pet" ${item?.category==='pet'?'selected':''}>🐾 ペット用品</option>
+          <option value="other" ${item?.category==='other'?'selected':''}>📦 その他</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">単位</label>
+        <select id="f-unit" class="form-select">${UNITS.map(u=>`<option ${unitVal===u?'selected':''}>${u}</option>`).join('')}</select></div>
     </div>
+
     <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">保管場所</label>
-        <select id="f-location" class="form-select">
-          <option value="">選択...</option>
-          ${LOCATIONS.map(l=>`<option ${item?.location===l?'selected':''}>${l}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">目標数量</label>
-        <input id="f-min-qty" type="number" class="form-input" value="${v('min_qty','0')}" min="0" step="0.5">
-      </div>
+      <div class="form-group"><label class="form-label">保管場所</label>
+        <select id="f-location" class="form-select"><option value="">選択...</option>
+          ${LOCATIONS.map(l=>`<option ${item?.location===l?'selected':''}>${l}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label">目標数量</label>
+        <input id="f-min-qty" type="number" class="form-input" value="${v('min_qty','0')}" min="0" step="0.5"></div>
     </div>
 
-    <!-- ③ アレルゲン -->
+    <!-- アレルゲン -->
     <div class="form-group">
-      <label class="form-label">⚠️ アレルゲン（含まれるもの）</label>
+      <label class="form-label">⚠️ アレルゲン</label>
       <input type="hidden" id="f-allergens-hidden" value="${existing.join(',')}">
-      <div style="margin-bottom:8px;">
-        <div style="font-size:11px;color:var(--txt-3);margin-bottom:5px;">選択中：</div>
-        <div id="allergen-selected-chips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:22px;">
-          ${existing.length
-            ? existing.map(a=>`<span class="allergen-chip-selected" onclick="InventoryPage.toggleAllergen('${a}')">${a} ✕</span>`).join('')
-            : '<span style="color:var(--txt-3);font-size:12px;">なし</span>'}
-        </div>
+      <div id="allergen-selected-chips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:22px;margin-bottom:6px;">
+        ${existing.length ? existing.map(a=>`<span class="allergen-chip-selected" onclick="InventoryPage.toggleAllergen('${a}')">${a} ✕</span>`).join('') : '<span style="color:var(--txt-3);font-size:12px;">なし</span>'}
       </div>
-      <div style="font-size:11px;color:var(--txt-3);margin-bottom:5px;">特定原材料（タップで追加）：</div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;">
-        ${ALLERGEN_LIST.filter(a=>a.major).map(a=>`
-          <button type="button" class="allergen-toggle-btn ${existing.includes(a.id)?'active':''}"
-            data-id="${a.id}" onclick="InventoryPage.toggleAllergen('${a.id}')">${a.label}</button>`).join('')}
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;">
-        ${ALLERGEN_LIST.filter(a=>!a.major).map(a=>`
-          <button type="button" class="allergen-toggle-btn ${existing.includes(a.id)?'active':''}"
-            data-id="${a.id}" onclick="InventoryPage.toggleAllergen('${a.id}')">${a.label}</button>`).join('')}
+      <div style="display:flex;flex-wrap:wrap;gap:5px;">
+        ${ALLERGEN_LIST.filter(a=>a.major).map(a=>`<button type="button" class="allergen-toggle-btn ${existing.includes(a.id)?'active':''}" data-id="${a.id}" onclick="InventoryPage.toggleAllergen('${a.id}')">${a.label}</button>`).join('')}
       </div>
     </div>
 
-    <!-- ④ 写真ギャラリー -->
+    <!-- 写真 -->
     <div class="form-group">
       <label class="form-label">📸 写真</label>
-      <div id="photo-gallery" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;margin-bottom:8px;"></div>
+      <div id="photo-gallery" style="display:flex;flex-wrap:wrap;gap:8px;min-height:32px;margin-bottom:8px;"></div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
         <button type="button" class="photo-add-btn" onclick="InventoryPage.addPhoto('package')">📦<br><span>パッケージ</span></button>
         <button type="button" class="photo-add-btn" onclick="InventoryPage.addPhoto('ingredients')">📋<br><span>成分表</span></button>
@@ -429,25 +485,16 @@ const InventoryPage = (() => {
       </div>
     </div>
 
-    <!-- ⑤ チェック -->
+    <!-- チェック -->
     <div class="form-group">
-      <label class="form-check">
-        <input type="checkbox" id="f-rolling" ${item?.is_rolling?'checked':''}>
-        <span class="form-check-label">🔄 ローリングストック対象</span>
-      </label>
-      <label class="form-check" style="margin-top:8px;">
-        <input type="checkbox" id="f-emergency" ${item?.is_emergency?'checked':''}>
-        <span class="form-check-label">🎒 非常用持ち出し袋に含む</span>
-      </label>
+      <label class="form-check"><input type="checkbox" id="f-rolling" ${item?.is_rolling?'checked':''}><span class="form-check-label">🔄 ローリングストック対象</span></label>
+      <label class="form-check" style="margin-top:8px;"><input type="checkbox" id="f-emergency" ${item?.is_emergency?'checked':''}><span class="form-check-label">🎒 非常用持ち出し袋に含む</span></label>
     </div>
 
-    <!-- ⑥ 在庫エントリー -->
+    <!-- 在庫エントリー -->
     <div style="margin-top:4px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div>
-          <div class="form-label" style="margin-bottom:1px;">📦 在庫エントリー（ロット別）</div>
-          <div style="font-size:11px;color:var(--txt-3);">ローリングストックの賞味期限ロットごとに登録</div>
-        </div>
+        <div class="form-label" style="margin-bottom:0;">📦 在庫エントリー</div>
         <button type="button" class="btn btn-sm btn-secondary" onclick="InventoryPage.addStockEntry()">＋ 追加</button>
       </div>
       <div id="stock-entries-list"></div>
@@ -459,25 +506,20 @@ const InventoryPage = (() => {
     </div>
 
     <div class="btn-row" style="margin-top:4px;">
-      <button class="btn btn-primary" onclick="InventoryPage.saveItem(${edit?item.id:'null'})">
-        ${edit?'💾 保存する':'➕ 追加する'}
-      </button>
+      <button class="btn btn-primary" onclick="InventoryPage.saveItem(${edit?item.id:'null'})">${edit?'💾 保存する':'➕ 追加する'}</button>
       ${edit?`<button class="btn btn-danger btn-sm" onclick="InventoryPage.deleteItem(${item.id})">削除</button>`:''}
     </div>
-    ${edit?`<button class="btn btn-secondary" style="margin-top:8px;" onclick="InventoryPage.addToShopping(${item.id})">
-      🛒 買い物リストに追加</button>`:''}`;
+    ${edit?`<button class="btn btn-secondary" style="margin-top:8px;" onclick="InventoryPage.addToShopping(${item.id})">🛒 買い物リストに追加</button>`:''}`;
   }
 
   function openAddModal() {
-    currentStockEntries=[{id:null,qty:1,expiry_date:'',note:''}];
-    currentItemImages=[];
+    currentStockEntries=[{id:null,qty:1,expiry_date:'',note:''}]; currentItemImages=[];
     Modal.open('➕ 備蓄品を追加', itemFormHTML(null));
     setTimeout(()=>{renderStockEntries();renderPhotos();},50);
   }
 
   async function openEditModal(id) {
-    const item=await DB.Items.get(id);
-    if(!item) return;
+    const item=await DB.Items.get(id); if(!item) return;
     currentStockEntries=(item.stocks||[]).map(s=>({id:s.id,qty:s.qty,expiry_date:s.expiry_date||'',note:s.note||''}));
     if(!currentStockEntries.length) currentStockEntries=[{id:null,qty:item.total_qty||1,expiry_date:'',note:''}];
     const imgs=await DB.ItemImages.getForItem(id);
@@ -490,46 +532,32 @@ const InventoryPage = (() => {
     const nameEl=document.getElementById('f-name');
     if(!nameEl||!nameEl.value.trim()){Toast.error('品名を入力してください');return;}
     currentStockEntries.forEach((entry,idx)=>{
-      const qEl=document.getElementById(`se-qty-${idx}`);
-      const eEl=document.getElementById(`se-expiry-${idx}`);
-      if(qEl) entry.qty=parseFloat(qEl.value)||0;
-      if(eEl) entry.expiry_date=eEl.value||'';
+      const qEl=document.getElementById('se-qty-'+idx); const eEl=document.getElementById('se-expiry-'+idx);
+      if(qEl) entry.qty=parseFloat(qEl.value)||0; if(eEl) entry.expiry_date=eEl.value||'';
     });
-    const allergens=getSelectedAllergens();
     const data={
-      name:       nameEl.value.trim(),
-      category:   document.getElementById('f-category')?.value||'other',
-      location:   document.getElementById('f-location')?.value||'',
-      unit:       document.getElementById('f-unit')?.value||'個',
-      min_qty:    parseFloat(document.getElementById('f-min-qty')?.value)||0,
-      is_rolling: document.getElementById('f-rolling')?.checked||false,
+      name:nameEl.value.trim(), category:document.getElementById('f-category')?.value||'other',
+      location:document.getElementById('f-location')?.value||'', unit:document.getElementById('f-unit')?.value||'個',
+      min_qty:parseFloat(document.getElementById('f-min-qty')?.value)||0,
+      is_rolling:document.getElementById('f-rolling')?.checked||false,
       is_emergency:document.getElementById('f-emergency')?.checked||false,
-      allergens:  allergens.join(','),
-      notes:      document.getElementById('f-notes')?.value.trim()||'',
+      allergens:getSelectedAllergens().join(','), notes:document.getElementById('f-notes')?.value.trim()||'',
     };
     let itemId;
-    if(idOrNull){ data.id=idOrNull; await DB.Items.update(data); itemId=idOrNull; Toast.success('✅ 更新しました'); }
-    else { itemId=await DB.Items.add(data); Toast.success('✅ 追加しました'); }
-    await DB.ItemStocks.replaceForItem(itemId, currentStockEntries.filter(e=>(parseFloat(e.qty)||0)>0));
+    if(idOrNull){data.id=idOrNull;await DB.Items.update(data);itemId=idOrNull;Toast.success('✅ 更新しました');}
+    else{itemId=await DB.Items.add(data);Toast.success('✅ 追加しました');}
+    await DB.ItemStocks.replaceForItem(itemId,currentStockEntries.filter(e=>(parseFloat(e.qty)||0)>0));
     for(const img of currentItemImages){
       if(img.toDelete&&img.id) await DB.ItemImages.delete(img.id);
       else if(img.isNew) await DB.ItemImages.add({item_id:itemId,image:img.base64,caption:img.caption,sort_order:0});
     }
-    Modal.close();
-    allItems=await DB.Items.getAll();
-    await buildAllergenWarnings(allItems);
-    render();
+    Modal.close(); allItems=await DB.Items.getAll(); await buildAllergenWarnings(allItems); render();
   }
 
   async function deleteItem(id) {
     if(!confirm('この備蓄品を削除しますか？')) return;
-    await DB.Items.delete(id);
-    await DB.ItemStocks.deleteForItem(id);
-    await DB.ItemImages.deleteForItem(id);
-    Toast.success('削除しました'); Modal.close();
-    allItems=await DB.Items.getAll();
-    await buildAllergenWarnings(allItems);
-    render();
+    await DB.Items.delete(id); await DB.ItemStocks.deleteForItem(id); await DB.ItemImages.deleteForItem(id);
+    Toast.success('削除しました'); Modal.close(); allItems=await DB.Items.getAll(); await buildAllergenWarnings(allItems); render();
   }
 
   async function addToShopping(id) {
@@ -541,7 +569,9 @@ const InventoryPage = (() => {
   function getAllergenWarnings(){return allergenWarningMap;}
 
   return {
-    render, setFilter, openAddModal, openEditModal, saveItem, deleteItem, addToShopping,
+    render, setFilter,
+    showAddMethodSheet, startQuickCapture, saveQuickItem, quickToFull,
+    openAddModal, openEditModal, saveItem, deleteItem, addToShopping,
     addStockEntry, removeStockEntry, syncStock,
     triggerVisionScan, addPhoto, removePhoto,
     toggleAllergen, renderAllergenUI, getAllergenWarnings,

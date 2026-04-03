@@ -1,246 +1,265 @@
-/* dashboard.js — Dashboard with fixed Survival Simulator */
+/* dashboard.js — Home Dashboard with Survival Simulator */
 const DashboardPage = (() => {
 
   async function render() {
     const el = document.getElementById('page-dashboard');
+    if (!el) return;
 
-    const [items, profiles, shopping, adults, children] = await Promise.all([
-      DB.Items.getAll(),
-      DB.Profiles.getAll(),
-      DB.Shopping.getAll(),
-      DB.Settings.get('family_adults', '2'),
-      DB.Settings.get('family_children', '0'),
-    ]);
+    // DB からデータ取得
+    let items = [], adults = 2, children = 0, targetDays = 7;
+    try {
+      items      = await DB.Items.getAll();
+      adults     = parseInt(await DB.Settings.get('family_adults', '2')) || 2;
+      children   = parseInt(await DB.Settings.get('family_children', '0')) || 0;
+      targetDays = parseInt(await DB.Settings.get('target_days', '7')) || 7;
+    } catch(e) {}
 
-    const now = new Date();
-    const totalAdults   = Math.max(0, parseInt(adults)   || 0);
-    const totalChildren = Math.max(0, parseInt(children) || 0);
-    const totalPeople   = totalAdults + totalChildren;
+    const people = adults + children;
 
-    // ── アラート集計 ──
-    const expiryAlerts = [];
-    for (const item of items) {
-      for (const stock of (item.stocks || [])) {
-        if (!stock.expiry_date) continue;
-        const days = Utils.daysUntil(stock.expiry_date);
-        if (days < 90) expiryAlerts.push({ item, stock, days });
-      }
-    }
-    expiryAlerts.sort((a, b) => a.days - b.days);
-    const expiredCount = expiryAlerts.filter(a => a.days < 0).length;
-    const urgentCount  = expiryAlerts.filter(a => a.days >= 0 && a.days < 30).length;
-    const warnCount    = expiryAlerts.filter(a => a.days >= 30 && a.days < 90).length;
-    const lowStock     = items.filter(i => i.min_qty > 0 && i.total_qty < i.min_qty);
-    const pendingShop  = shopping.filter(s => !s.is_bought).length;
-
-    // ── アレルゲン照合 ──
-    const allergenAlerts = []; // { item, allergen, who }
-    for (const item of items) {
-      if (!item.allergens) continue;
-      const ia = item.allergens.split(',').map(a=>a.trim()).filter(Boolean);
-      for (const allergen of ia) {
-        for (const p of profiles) {
-          const txt = [p.allergies_food, p.allergies_drug].filter(Boolean).join('、');
-          if (txt && txt.includes(allergen)) {
-            if (!allergenAlerts.find(a=>a.item.id===item.id&&a.allergen===allergen&&a.who===p.owner_name)) {
-              allergenAlerts.push({ item, allergen, who: p.owner_name });
-            }
-          }
-        }
-      }
-    }
-
-    // ── サバイバル計算 (item_stocks ベース) ──
-    let totalWaterL = 0;
-    let totalFoodServings = 0;
+    // カテゴリ別集計
+    const totals = { water:0, food:0, medicine:0, sanitation:0, disaster:0, pet:0, other:0 };
+    let expiringCount = 0, expiredCount = 0, lowStockCount = 0;
+    const expiringItems = [];
 
     for (const item of items) {
-      const stocks = item.stocks || [];
-      const totalQty = stocks.reduce((s, e) => s + (parseFloat(e.qty) || 0), 0);
-      if (totalQty <= 0) continue;
+      const cat = item.category || 'other';
+      const qty = item.total_qty || 0;
+      if (totals[cat] !== undefined) totals[cat] += qty;
 
-      if (item.category === 'water') {
-        const unit = item.unit || '本';
-        if      (unit === 'L')   totalWaterL += totalQty;
-        else if (unit === 'mL')  totalWaterL += totalQty / 1000;
-        else if (unit === '缶')  totalWaterL += totalQty * 0.35;
-        else if (unit === 'カップ') totalWaterL += totalQty * 0.2;
-        else                     totalWaterL += totalQty * 0.5; // 本/個/袋 → 500mL 想定
-      } else if (item.category === 'food') {
-        const unit = item.unit || '個';
-        if      (unit === '食')  totalFoodServings += totalQty;
-        else if (unit === '袋')  totalFoodServings += totalQty * 3;  // 1袋=約3食
-        else if (unit === '缶')  totalFoodServings += totalQty * 2;  // 1缶=約2食
-        else if (unit === '箱')  totalFoodServings += totalQty * 6;  // 1箱=約6食
-        else if (unit === 'kg')  totalFoodServings += totalQty * 10; // 1kg=約10食
-        else                     totalFoodServings += totalQty;      // 個/本 → 1食
+      if (item.nearest_expiry) {
+        const days = Utils.daysUntil(item.nearest_expiry);
+        if (days !== null && days < 0) expiredCount++;
+        else if (days !== null && days <= 30) { expiringCount++; expiringItems.push(item); }
       }
+      if (item.min_qty > 0 && qty < item.min_qty) lowStockCount++;
     }
 
-    // 1人あたり: 水3L/日、食事3食/日
-    const waterDays = totalPeople > 0
-      ? Math.floor(totalWaterL / (3 * (totalAdults + totalChildren * 0.7)))
-      : 0;
-    const mealsPerDay = totalAdults * 3 + totalChildren * 2;
-    const foodDays = mealsPerDay > 0
-      ? Math.floor(totalFoodServings / mealsPerDay)
-      : 0;
-    const simDays = (totalWaterL > 0 || totalFoodServings > 0)
-      ? Math.min(
-          totalWaterL > 0 ? waterDays : 9999,
-          totalFoodServings > 0 ? foodDays : 9999
-        )
-      : 0;
+    // シミュレーション計算
+    const waterPerDay  = people * 3; // 1人3L/日
+    const foodPerDay   = people * 3; // 1人3食/日
+    const waterDays    = waterPerDay > 0 ? Math.floor(totals.water / waterPerDay) : 0;
+    const foodDays     = foodPerDay > 0 ? Math.floor(totals.food / foodPerDay) : 0;
+    const survivalDays = Math.min(waterDays, foodDays);
 
-    const TARGET_DAYS = 7;
-    const waterPct = Math.min(100, Math.round((waterDays / TARGET_DAYS) * 100));
-    const foodPct  = Math.min(100, Math.round((foodDays  / TARGET_DAYS) * 100));
-    const barColor = (pct) => pct >= 100 ? 'green' : pct >= 50 ? 'amber' : 'red';
-    const dayColor = simDays >= TARGET_DAYS ? 'var(--green)' : simDays >= 3 ? 'var(--amber)' : 'var(--red)';
+    const waterNeeded  = waterPerDay * targetDays;
+    const foodNeeded   = foodPerDay * targetDays;
+    const waterPct     = waterNeeded > 0 ? Math.min(100, Math.round(totals.water / waterNeeded * 100)) : 0;
+    const foodPct      = foodNeeded > 0 ? Math.min(100, Math.round(totals.food / foodNeeded * 100)) : 0;
 
-    el.innerHTML = `<div class="page-inner">
-      <div style="padding:16px 0 4px;">
-        <div style="font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:0.02em;">備蓄ダッシュボード</div>
-        <div style="font-size:13px;color:var(--txt-3);margin-top:2px;">${now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'})}</div>
+    const totalItems = items.length;
+    const statusColor = survivalDays >= targetDays ? 'text-primary' : survivalDays >= 3 ? 'text-tertiary' : 'text-error';
+    const statusMsg = survivalDays >= targetDays
+      ? '目標日数を達成しています。'
+      : survivalDays >= 3
+        ? `目標まであと${targetDays - survivalDays}日分の備蓄が必要です。`
+        : '備蓄が不足しています。早めの補充をおすすめします。';
+
+    // 円グラフ SVG パラメータ
+    const circum = 251; // 2π×40
+    const waterOffset = circum - (circum * waterPct / 100);
+    const foodOffset  = circum - (circum * foodPct / 100);
+
+    // 期限切れアイテムリスト（上位5件）
+    expiringItems.sort((a, b) => {
+      const da = Utils.daysUntil(a.nearest_expiry);
+      const db = Utils.daysUntil(b.nearest_expiry);
+      return (da || 9999) - (db || 9999);
+    });
+    const topExpiring = expiringItems.slice(0, 5);
+
+    el.innerHTML = `
+    <!-- ═══ ヒーロー: 生存可能日数 ═══ -->
+    <section class="mb-10 text-center">
+      <p class="font-headline text-primary font-bold tracking-wide text-xs uppercase mb-1">
+        <span class="material-symbols-rounded text-sm align-middle">shield</span> Survival Capacity
+      </p>
+      <div class="flex items-center justify-center gap-3">
+        <span class="font-headline text-7xl md:text-8xl font-bold ${statusColor} tracking-tight">
+          ${String(survivalDays).padStart(2, '0')}
+        </span>
+        <span class="font-headline text-2xl font-bold text-secondary self-end mb-3">日</span>
       </div>
+      <p class="text-on-surface-variant font-medium mt-3 max-w-sm mx-auto text-sm">${statusMsg}</p>
+    </section>
 
-      ${(expiredCount || urgentCount) ? `
-      <div class="card" style="background:var(--red-dim);border-color:var(--red-border);margin-top:14px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:24px;">⚠️</span>
+    <!-- ═══ クイックステータス ═══ -->
+    <div class="grid grid-cols-3 gap-3 mb-8">
+      <div class="bg-surface border border-secondary-container rounded-2xl p-4 text-center">
+        <span class="material-symbols-rounded text-primary mb-1" style="font-variation-settings:'FILL' 1;">inventory_2</span>
+        <div class="font-headline font-bold text-xl text-on-surface">${totalItems}</div>
+        <div class="text-[10px] text-on-surface-variant font-bold">備蓄アイテム</div>
+      </div>
+      <div class="bg-surface border border-secondary-container rounded-2xl p-4 text-center ${expiringCount > 0 ? 'border-tertiary/40' : ''}">
+        <span class="material-symbols-rounded ${expiringCount > 0 ? 'text-tertiary' : 'text-primary'} mb-1" style="font-variation-settings:'FILL' 1;">schedule</span>
+        <div class="font-headline font-bold text-xl ${expiringCount > 0 ? 'text-tertiary' : 'text-on-surface'}">${expiringCount}</div>
+        <div class="text-[10px] text-on-surface-variant font-bold">期限間近</div>
+      </div>
+      <div class="bg-surface border border-secondary-container rounded-2xl p-4 text-center ${expiredCount > 0 ? 'border-error/40' : ''}">
+        <span class="material-symbols-rounded ${expiredCount > 0 ? 'text-error' : 'text-primary'} mb-1" style="font-variation-settings:'FILL' 1;">warning</span>
+        <div class="font-headline font-bold text-xl ${expiredCount > 0 ? 'text-error' : 'text-on-surface'}">${expiredCount}</div>
+        <div class="text-[10px] text-on-surface-variant font-bold">期限切れ</div>
+      </div>
+    </div>
+
+    <!-- ═══ 水・食料ゲージ ═══ -->
+    <div class="grid grid-cols-2 gap-4 mb-8">
+      <!-- 飲料水カード -->
+      <div class="bg-white border border-secondary-container rounded-2xl p-5 shadow-sm">
+        <div class="flex justify-between items-start mb-4">
           <div>
-            <div style="font-weight:700;font-size:14px;color:var(--red);">
-              ${expiredCount ? `期限切れ ${expiredCount}件` : ''}
-              ${urgentCount  ? ` 30日以内 ${urgentCount}件` : ''}
-            </div>
-            <div style="font-size:12px;color:var(--txt-2);">備蓄品リストを確認してください</div>
+            <h4 class="font-headline font-bold text-base text-on-surface">飲料水</h4>
+            <p class="text-[10px] text-primary font-bold tracking-widest uppercase">Water</p>
           </div>
-          <button onclick="App.navigate('inventory')" class="btn btn-sm btn-danger" style="margin-left:auto;">確認→</button>
+          <span class="material-symbols-rounded text-primary" style="font-variation-settings:'FILL' 1;">water_drop</span>
         </div>
-      </div>` : ''}
-
-      <div class="stat-grid" style="margin-top:14px;">
-        <div class="stat-card" onclick="App.navigate('inventory')">
-          <div class="stat-num blue">${items.length}</div>
-          <div class="stat-label">備蓄品</div>
+        <div class="relative h-20 w-20 mx-auto mb-4">
+          <svg class="w-full h-full transform -rotate-90" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="40" fill="transparent" stroke="#F0F4F4" stroke-width="8"/>
+            <circle cx="48" cy="48" r="40" fill="transparent" stroke="#2D918B" stroke-width="8"
+              stroke-dasharray="${circum}" stroke-dashoffset="${waterOffset}" stroke-linecap="round"
+              class="transition-all duration-700"/>
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="font-headline font-bold text-lg text-primary">${waterPct}%</span>
+          </div>
         </div>
-        <div class="stat-card" onclick="App.navigate('inventory')">
-          <div class="stat-num ${expiredCount||urgentCount ? 'red':'amber'}">${expiredCount + urgentCount}</div>
-          <div class="stat-label">要確認</div>
-        </div>
-        <div class="stat-card" onclick="App.navigate('profiles')">
-          <div class="stat-num green">${profiles.length}</div>
-          <div class="stat-label">登録人物</div>
+        <div class="space-y-1 text-xs font-bold">
+          <div class="flex justify-between"><span class="text-on-surface-variant">現在</span><span>${totals.water} L</span></div>
+          <div class="flex justify-between"><span class="text-on-surface-variant">必要 (${targetDays}日)</span><span class="${totals.water >= waterNeeded ? 'text-primary' : 'text-error'}">${waterNeeded} L</span></div>
         </div>
       </div>
 
-      <!-- ── サバイバル計算 ── -->
-      <div class="section-header">
-        <span class="section-title">🧮 サバイバル計算</span>
-        <button class="section-action" onclick="App.navigate('settings')">家族設定 →</button>
-      </div>
-      <div class="sim-card">
-        <div class="sim-title">現在の備蓄で推定生存可能日数</div>
-        <div class="sim-day-display">
-          <div class="sim-day-num" style="color:${dayColor};">${simDays}</div>
-          <div class="sim-day-unit">日分</div>
-          ${simDays >= TARGET_DAYS
-            ? `<span style="font-size:13px;color:var(--green);margin-left:8px;">✓ 目標達成</span>`
-            : `<span style="font-size:13px;color:var(--red);margin-left:8px;">目標: ${TARGET_DAYS}日</span>`}
-        </div>
-
-        <div class="sim-bar-wrap">
-          <div class="sim-bar-label">
-            <span>💧 水 <span style="color:var(--txt-3);font-size:11px;">(3L/人/日)</span></span>
-            <span>${totalWaterL.toFixed(1)}L → <strong>${waterDays}日分</strong></span>
+      <!-- 食料カード -->
+      <div class="bg-white border border-secondary-container rounded-2xl p-5 shadow-sm">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <h4 class="font-headline font-bold text-base text-on-surface">食料</h4>
+            <p class="text-[10px] text-tertiary font-bold tracking-widest uppercase">Food</p>
           </div>
-          <div class="sim-bar"><div class="sim-bar-fill ${barColor(waterPct)}" style="width:${waterPct}%"></div></div>
+          <span class="material-symbols-rounded text-tertiary" style="font-variation-settings:'FILL' 1;">restaurant</span>
         </div>
-
-        <div class="sim-bar-wrap" style="margin-top:10px;">
-          <div class="sim-bar-label">
-            <span>🍱 食料 <span style="color:var(--txt-3);font-size:11px;">(3食/人/日)</span></span>
-            <span>${totalFoodServings.toFixed(0)}食分 → <strong>${foodDays}日分</strong></span>
-          </div>
-          <div class="sim-bar"><div class="sim-bar-fill ${barColor(foodPct)}" style="width:${foodPct}%"></div></div>
-        </div>
-
-        <div style="margin-top:12px;padding:10px;background:var(--bg-3);border-radius:8px;">
-          <div style="font-size:11px;color:var(--txt-3);line-height:1.7;">
-            👥 大人 ${totalAdults}人 / 子供 ${totalChildren}人 ／ 目標 ${TARGET_DAYS}日分<br>
-            💧 本・個 → 500mL / 缶 → 350mL ／ 🍱 袋 → 3食 / 缶 → 2食 / 箱 → 6食 として計算
+        <div class="relative h-20 w-20 mx-auto mb-4">
+          <svg class="w-full h-full transform -rotate-90" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="40" fill="transparent" stroke="#F0F4F4" stroke-width="8"/>
+            <circle cx="48" cy="48" r="40" fill="transparent" stroke="#F2994A" stroke-width="8"
+              stroke-dasharray="${circum}" stroke-dashoffset="${foodOffset}" stroke-linecap="round"
+              class="transition-all duration-700"/>
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="font-headline font-bold text-lg text-tertiary">${foodPct}%</span>
           </div>
         </div>
-      </div>
-
-      ${expiryAlerts.length ? `
-      <div class="section-header"><span class="section-title">⏰ 期限アラート</span></div>
-      <div class="card">
-        ${expiryAlerts.slice(0,8).map(({item, stock, days}) => {
-          const cls = days < 0 ? 'red' : days < 30 ? 'red' : 'amber';
-          const label = days < 0
-            ? `${Math.abs(days)}日前に期限切れ`
-            : days === 0 ? '本日期限'
-            : `残${days}日`;
-          return `<div class="alert-item" onclick="InventoryPage.openEditModal(${item.id})">
-            <div class="alert-dot ${cls}"></div>
-            <div class="alert-name">${Utils.escape(item.name)}</div>
-            <div style="font-size:11px;color:var(--txt-3);margin-left:4px;">${stock.qty}${Utils.escape(item.unit||'個')}</div>
-            <div class="alert-days ${days<30?'urgent':'warn'}" style="margin-left:auto;">${label}</div>
-          </div>`;
-        }).join('')}
-      </div>` : ''}
-
-      ${lowStock.length ? `
-      <div class="section-header"><span class="section-title">📉 在庫不足</span></div>
-      <div class="card">
-        ${lowStock.map(item => `
-          <div class="alert-item" onclick="App.navigate('shopping')">
-            <div class="alert-dot amber"></div>
-            <div class="alert-name">${Utils.escape(item.name)}</div>
-            <div class="alert-days warn">${item.total_qty}/${item.min_qty}${Utils.escape(item.unit||'')}</div>
-          </div>
-        `).join('')}
-      </div>` : ''}
-
-      ${allergenAlerts.length ? `
-      <div class="section-header">
-        <span class="section-title">⚠️ アレルゲン注意</span>
-        <button class="section-action" onclick="App.navigate('inventory')">備蓄品リスト →</button>
-      </div>
-      <div class="card" style="background:rgba(245,156,42,0.06);border-color:var(--amber-border);">
-        <div style="font-size:12px;color:var(--amber);font-weight:700;margin-bottom:10px;">
-          家族のアレルギーに該当する備蓄品が見つかりました
+        <div class="space-y-1 text-xs font-bold">
+          <div class="flex justify-between"><span class="text-on-surface-variant">現在</span><span>${totals.food} 食</span></div>
+          <div class="flex justify-between"><span class="text-on-surface-variant">必要 (${targetDays}日)</span><span class="${totals.food >= foodNeeded ? 'text-primary' : 'text-error'}">${foodNeeded} 食</span></div>
         </div>
-        ${[...new Map(allergenAlerts.map(a=>[a.item.id+a.allergen, a])).values()].slice(0,8).map(({item, allergen, who}) => `
-          <div class="alert-item" onclick="InventoryPage.openEditModal(${item.id})">
-            <span style="font-size:18px;flex-shrink:0;">⚠️</span>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${Utils.escape(item.name)}</div>
-              <div style="font-size:11px;color:var(--txt-3);">含む: <span style="color:var(--amber);font-weight:700;">${Utils.escape(allergen)}</span></div>
-            </div>
-            <div style="flex-shrink:0;text-align:right;">
-              <span class="allergen-who-badge">${Utils.escape(who)}</span>
-            </div>
-          </div>`).join('')}
-      </div>` : ''}
-
-      <div class="section-header"><span class="section-title">⚡ クイックアクション</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <button class="btn btn-secondary" onclick="App.navigate('inventory');setTimeout(()=>InventoryPage.openAddModal(),300)">＋ 備蓄品を追加</button>
-        <button class="btn btn-secondary" onclick="App.navigate('profiles');setTimeout(()=>ProfilesPage.openAddModal(),300)">＋ 人物を登録</button>
-        <button class="btn btn-secondary" onclick="App.showEmergencyCard()">🆘 緊急カード表示</button>
-        <button class="btn btn-secondary" onclick="App.navigate('shopping')">🛒 買い物 (${pendingShop}件)</button>
       </div>
+    </div>
 
-      <div class="section-header"><span class="section-title">🌐 防災情報</span></div>
-      <div class="disaster-links" style="margin-bottom:20px;">
-        <a href="https://www.jma.go.jp/bosai/" target="_blank" class="disaster-link"><span class="disaster-link-icon">🌡️</span><span>気象庁<br>防災情報</span></a>
-        <a href="https://www.nhk.or.jp/sokuho/" target="_blank" class="disaster-link"><span class="disaster-link-icon">📺</span><span>NHK<br>速報ニュース</span></a>
-        <a href="https://www.bousai.go.jp/" target="_blank" class="disaster-link"><span class="disaster-link-icon">🏛️</span><span>内閣府<br>防災情報</span></a>
-        <a href="https://www.fdma.go.jp/" target="_blank" class="disaster-link"><span class="disaster-link-icon">🚒</span><span>消防庁<br>情報</span></a>
+    <!-- ═══ カテゴリ別備蓄 ═══ -->
+    <div class="bg-white border border-secondary-container rounded-2xl overflow-hidden shadow-sm mb-8">
+      <div class="p-5">
+        <h3 class="font-headline text-sm font-bold tracking-wide text-primary mb-5 flex items-center gap-2">
+          <span class="material-symbols-rounded text-lg">inventory</span> カテゴリ別備蓄
+        </h3>
+        <div class="space-y-4">
+          ${renderCategoryBar('💊', '医薬品', totals.medicine, '点')}
+          ${renderCategoryBar('🧴', '衛生用品', totals.sanitation, '点')}
+          ${renderCategoryBar('🔦', '防災グッズ', totals.disaster, '点')}
+          ${renderCategoryBar('🐾', 'ペット用品', totals.pet, '点')}
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 期限間近アイテム ═══ -->
+    ${topExpiring.length > 0 ? `
+    <div class="bg-white border border-secondary-container rounded-2xl overflow-hidden shadow-sm mb-8">
+      <div class="p-5">
+        <h3 class="font-headline text-sm font-bold tracking-wide text-tertiary mb-4 flex items-center gap-2">
+          <span class="material-symbols-rounded text-lg">event_busy</span> 期限間近のアイテム
+        </h3>
+        <div class="space-y-3">
+          ${topExpiring.map(item => {
+            const d = Utils.daysUntil(item.nearest_expiry);
+            const cls = d < 0 ? 'bg-error text-white' : d < 7 ? 'bg-error/10 text-error' : 'bg-tertiary/10 text-tertiary';
+            const label = d < 0 ? `${Math.abs(d)}日超過` : d === 0 ? '本日' : `残${d}日`;
+            return `<div class="flex items-center gap-3 p-3 rounded-xl bg-surface-variant/50" onclick="App.navigate('inventory')">
+              <span class="text-xl">${Utils.categoryIcon(item.category)}</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-sm truncate">${Utils.escape(item.name)}</div>
+                <div class="text-[11px] text-on-surface-variant">${Utils.formatDate(item.nearest_expiry)}</div>
+              </div>
+              <span class="text-[11px] font-bold px-2 py-1 rounded-lg ${cls}">${label}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      ${expiringItems.length > 5 ? `<div class="px-5 pb-4"><button class="text-xs text-primary font-bold" onclick="App.navigate('inventory')">すべて表示 →</button></div>` : ''}
+    </div>` : ''}
+
+    <!-- ═══ アドバイス ═══ -->
+    <div class="bg-primary-container/30 border border-primary/10 rounded-2xl px-5 py-4 flex items-start gap-3 mb-8">
+      <span class="material-symbols-rounded text-primary text-xl mt-0.5" style="font-variation-settings:'FILL' 1;">tips_and_updates</span>
+      <div class="text-xs font-medium text-on-surface-variant leading-relaxed">
+        ${getAdvice(totals, waterNeeded, foodNeeded, targetDays, lowStockCount, expiredCount)}
+      </div>
+    </div>
+
+    <!-- ═══ クイックアクション ═══ -->
+    <div class="grid grid-cols-2 gap-3 mb-6">
+      <button onclick="InventoryPage.showAddMethodSheet()" class="flex items-center gap-3 bg-white border border-secondary-container rounded-2xl p-4 shadow-sm active:scale-95 transition-transform">
+        <div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center">
+          <span class="material-symbols-rounded text-primary">add_a_photo</span>
+        </div>
+        <div class="text-left">
+          <div class="font-bold text-sm">撮るだけ登録</div>
+          <div class="text-[10px] text-on-surface-variant">写真で備蓄品を追加</div>
+        </div>
+      </button>
+      <button onclick="App.navigate('settings')" class="flex items-center gap-3 bg-white border border-secondary-container rounded-2xl p-4 shadow-sm active:scale-95 transition-transform">
+        <div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center">
+          <span class="material-symbols-rounded text-primary">tune</span>
+        </div>
+        <div class="text-left">
+          <div class="font-bold text-sm">設定</div>
+          <div class="text-[10px] text-on-surface-variant">家族構成・AI設定</div>
+        </div>
+      </button>
+    </div>
+    `;
+  }
+
+  function renderCategoryBar(icon, label, qty, unit) {
+    const maxQty = 30;
+    const pct = Math.min(100, Math.round((qty / maxQty) * 100));
+    return `<div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-sm">${icon}</div>
+      <div class="flex-1">
+        <div class="flex justify-between mb-1 text-xs font-bold">
+          <span class="text-on-surface">${label}</span>
+          <span class="text-on-surface-variant">${qty} ${unit}</span>
+        </div>
+        <div class="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden">
+          <div class="h-full bg-primary rounded-full transition-all duration-500" style="width:${pct}%"></div>
+        </div>
       </div>
     </div>`;
+  }
+
+  function getAdvice(totals, waterNeeded, foodNeeded, targetDays, lowStockCount, expiredCount) {
+    const msgs = [];
+    if (totals.water < waterNeeded) {
+      const deficit = waterNeeded - totals.water;
+      msgs.push(`飲料水が <strong class="text-primary">${deficit}L</strong> 不足しています。2Lペットボトル <strong>${Math.ceil(deficit / 2)}本</strong> の追加を推奨します。`);
+    }
+    if (totals.food < foodNeeded) {
+      const deficit = foodNeeded - totals.food;
+      msgs.push(`食料が <strong class="text-tertiary">${deficit}食</strong> 不足しています。`);
+    }
+    if (expiredCount > 0) msgs.push(`<strong class="text-error">期限切れ${expiredCount}件</strong>があります。早めに交換してください。`);
+    if (lowStockCount > 0) msgs.push(`在庫不足のアイテムが <strong>${lowStockCount}件</strong> あります。`);
+    if (!msgs.length) msgs.push(`すべての備蓄が目標${targetDays}日分を満たしています。定期的な確認を続けましょう。`);
+    return msgs.join(' ');
   }
 
   return { render };
