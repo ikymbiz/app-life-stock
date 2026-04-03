@@ -1,1 +1,1 @@
-# app-life-stock
+app-life-stock
