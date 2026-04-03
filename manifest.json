@@ -1,0 +1,27 @@
+{
+  "name": "LifeStock — 防災・備蓄管理",
+  "short_name": "LifeStock",
+  "description": "もしもの時に、物と健康を迷わず守る防災・備蓄管理アプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#060a10",
+  "theme_color": "#060a10",
+  "orientation": "portrait",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["lifestyle", "utilities"],
+  "screenshots": []
+}
