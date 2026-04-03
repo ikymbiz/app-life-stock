@@ -178,18 +178,21 @@ const App = (() => {
       btn.addEventListener('click', () => navigate(btn.dataset.page));
     });
 
-    // Add item center button
+    // ＋ ボタン: 登録方法選択シートを表示
     document.querySelectorAll('.nav-item[data-action="add-item"]').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (currentPage === 'inventory') {
-          InventoryPage.openAddModal();
-        } else if (currentPage === 'profiles') {
+        if (currentPage === 'profiles') {
           ProfilesPage.openAddModal();
         } else if (currentPage === 'shopping') {
           ShoppingPage.openAddModal();
         } else {
-          navigate('inventory');
-          setTimeout(() => InventoryPage.openAddModal(), 300);
+          // 備蓄品: 登録方法選択（撮るだけ / バーコード / 手動）
+          if (currentPage !== 'inventory') {
+            navigate('inventory');
+            setTimeout(() => InventoryPage.showAddMethodSheet(), 300);
+          } else {
+            InventoryPage.showAddMethodSheet();
+          }
         }
       });
     });
