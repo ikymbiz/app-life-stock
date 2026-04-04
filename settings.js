@@ -5,11 +5,9 @@ const SettingsPage = (() => {
     const el = document.getElementById('page-settings');
     if (!el) return;
 
-    let aiProvider='none', aiModel='', apiKey='', adults='2', children='0';
+    let aiProvider='none', aiModel='', apiKey='';
     try {
       aiProvider = await DB.Settings.get('ai_provider','none');
-      adults     = await DB.Settings.get('family_adults','2');
-      children   = await DB.Settings.get('family_children','0');
       if (aiProvider !== 'none') {
         aiModel = await DB.Settings.get('ai_model_'+aiProvider, VisionAI.getDefaultModel(aiProvider));
         apiKey  = await DB.Settings.get('ai_key_'+aiProvider, '');
@@ -68,14 +66,6 @@ const SettingsPage = (() => {
     }
     h += '</div>';
 
-    // ── 家族構成 ──
-    h += secTitle('groups','家族構成');
-    h += '<div class="bg-white border border-secondary-container rounded-2xl p-5 shadow-sm mb-6">';
-    h += '<p class="text-xs text-on-surface-variant mb-5">生存日数シミュレーションに使用します。</p>';
-    h += mkStepper('adults','大人','12歳以上',adults);
-    h += mkStepper('children','子供','12歳未満',children);
-    h += '</div>';
-
     // ── データ管理 ──
     h += secTitle('folder','データ管理');
     h += '<div class="bg-white border border-secondary-container rounded-2xl overflow-hidden shadow-sm mb-6">';
@@ -96,14 +86,6 @@ const SettingsPage = (() => {
   function fmtCost(v){return v<1?v.toFixed(2):String(Math.round(v*10)/10);}
   function mkOpt(v,l,cur){return '<option value="'+v+'"'+(v===cur?' selected':'')+'>'+l+'</option>';}
   function secTitle(icon,text){return '<h3 class="flex items-center gap-2 text-xs font-bold text-primary tracking-wide mb-3 mt-2"><span class="material-symbols-rounded text-base">'+icon+'</span> '+text+'</h3>';}
-  function mkStepper(key,label,sub,val){
-    return '<div class="flex items-center justify-between mb-4"><div><span class="block font-bold text-sm">'+label+'</span><span class="text-[11px] text-on-surface-variant">'+sub+'</span></div>'
-    +'<div class="flex items-center gap-3 bg-surface-variant rounded-full px-2 py-1">'
-    +'<button onclick="SettingsPage.adj(\''+key+'\',-1)" class="text-primary p-1"><span class="material-symbols-rounded text-xl">remove_circle</span></button>'
-    +'<span id="count-'+key+'" class="font-headline font-bold text-lg w-6 text-center">'+val+'</span>'
-    +'<button onclick="SettingsPage.adj(\''+key+'\',1)" class="text-primary p-1"><span class="material-symbols-rounded text-xl">add_circle</span></button>'
-    +'</div></div>';
-  }
   function mkMenu(icon,title,sub,action){
     return '<button onclick="'+action+'" class="w-full flex items-center gap-4 p-4 text-left active:bg-surface-variant/50 transition-colors">'
     +'<span class="material-symbols-rounded text-primary">'+icon+'</span>'
@@ -135,12 +117,6 @@ const SettingsPage = (() => {
     try{await VisionAI.testConnection();if(res)res.innerHTML='<span class="text-primary font-bold">✅ 接続成功</span>';Toast.success('✅ 接続OK');}
     catch(e){var msg=e.message==='NO_KEY'?'APIキーを入力してください':e.message;if(res)res.innerHTML='<span class="text-error font-bold">❌ '+esc(msg)+'</span>';Toast.error('接続失敗');}
   }
-  async function adj(type,delta){
-    var key='family_'+type,cur=parseInt(await DB.Settings.get(key,'0'))||0,next=Math.max(0,cur+delta);
-    await DB.Settings.set(key,String(next));
-    var el=document.getElementById('count-'+type);
-    if(el){el.textContent=next;el.style.transform='scale(1.2)';setTimeout(function(){el.style.transform='';},150);}
-  }
   async function exportData(){
     try{var data=await DB.exportAll();if(data.settings)data.settings=data.settings.filter(function(s){return !s.key.startsWith('ai_key_');});
     var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});var a=document.createElement('a');
@@ -164,8 +140,7 @@ const SettingsPage = (() => {
   function toggleKeyVisibility(){toggleKey();}
   async function saveApiKey(){await saveKey();}
   async function testConnection(){await testKey();}
-  async function adjustFamily(t,d){await adj(t,d);}
 
-  return {render,onProviderChange,onModelChange,toggleKey,saveKey,testKey,adj,exportData,importData,clearAll,
-    selectProvider,selectModel,toggleKeyVisibility,saveApiKey,testConnection,adjustFamily};
+  return {render,onProviderChange,onModelChange,toggleKey,saveKey,testKey,exportData,importData,clearAll,
+    selectProvider,selectModel,toggleKeyVisibility,saveApiKey,testConnection};
 })();

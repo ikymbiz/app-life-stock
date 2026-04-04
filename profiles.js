@@ -3,6 +3,22 @@ const ProfilesPage = (() => {
 
   let allProfiles = [];
 
+  const ALLERGENS_28 = [
+    {id:'小麦',  label:'🌾 小麦',  major:true},{id:'卵',    label:'🥚 卵',    major:true},
+    {id:'乳',    label:'🥛 乳',    major:true},{id:'そば',  label:'🍜 そば',  major:true},
+    {id:'落花生',label:'🥜 落花生',major:true},{id:'えび',  label:'🦐 えび',  major:true},
+    {id:'かに',  label:'🦀 かに',  major:true},{id:'くるみ',label:'🌰 くるみ',major:true},
+    {id:'アーモンド',label:'アーモンド'},{id:'あわび',label:'あわび'},{id:'いか',label:'いか'},
+    {id:'いくら',label:'いくら'},{id:'オレンジ',label:'🍊 オレンジ'},
+    {id:'カシューナッツ',label:'カシューナッツ'},{id:'キウイ',label:'🥝 キウイ'},
+    {id:'牛肉',label:'🥩 牛肉'},{id:'ごま',label:'ごま'},{id:'さけ',label:'さけ'},
+    {id:'さば',label:'さば'},{id:'大豆',label:'大豆'},{id:'鶏肉',label:'鶏肉'},
+    {id:'豚肉',label:'豚肉'},{id:'バナナ',label:'🍌 バナナ'},{id:'もも',label:'🍑 もも'},
+    {id:'やまいも',label:'やまいも'},{id:'りんご',label:'🍎 りんご'},
+    {id:'ゼラチン',label:'ゼラチン'},{id:'マカダミアナッツ',label:'マカダミア'},
+  ];
+  const ALLERGEN_IDS = ALLERGENS_28.map(function(a){ return a.id; });
+
   async function render() {
     const el = document.getElementById('page-profiles');
     if (!el) return;
@@ -96,11 +112,41 @@ const ProfilesPage = (() => {
     h += '<option value="その他"'+(gender==='その他'?' selected':'')+'>その他</option>';
     h += '</select></div></div>';
 
-    // アレルギー
+    // アレルギー — 既存データを「26品目」と「その他」に分離
+    var existingAll = allergies ? allergies.split(',').map(function(a){return a.trim();}).filter(Boolean) : [];
+    var selectedIds = existingAll.filter(function(a){ return ALLERGEN_IDS.indexOf(a) >= 0; });
+    var otherText   = existingAll.filter(function(a){ return ALLERGEN_IDS.indexOf(a) < 0; }).join(', ');
+
     h += '<div class="form-group">';
     h += '<label class="form-label">⚠️ アレルギー</label>';
-    h += '<input id="pf-allergies" class="form-input" value="'+allergies+'" placeholder="例: 小麦, 卵, 乳（カンマ区切り）">';
-    h += '<p class="text-[10px] text-on-surface-variant mt-1">備蓄品のアレルゲン照合に使用されます</p>';
+    h += '<input type="hidden" id="pf-allergen-selected" value="'+selectedIds.join(',')+'">';
+    h += '<p class="text-[10px] text-on-surface-variant mb-2">備蓄品のアレルゲン照合に使用されます</p>';
+
+    // 特定原材料8品目
+    h += '<div class="text-[11px] text-on-surface-variant font-bold mb-1">特定原材料（8品目）</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">';
+    for (var ai=0; ai<ALLERGENS_28.length; ai++) {
+      var a = ALLERGENS_28[ai];
+      if (!a.major) continue;
+      var on = selectedIds.indexOf(a.id) >= 0;
+      h += '<button type="button" class="allergen-toggle-btn'+(on?' active':'')+'" data-aid="'+a.id+'" onclick="ProfilesPage.toggleAllergen(\''+a.id+'\')">' +a.label+'</button>';
+    }
+    h += '</div>';
+
+    // 準ずるもの20品目
+    h += '<div class="text-[11px] text-on-surface-variant font-bold mb-1">特定原材料に準ずるもの（20品目）</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
+    for (var ai2=0; ai2<ALLERGENS_28.length; ai2++) {
+      var a2 = ALLERGENS_28[ai2];
+      if (a2.major) continue;
+      var on2 = selectedIds.indexOf(a2.id) >= 0;
+      h += '<button type="button" class="allergen-toggle-btn'+(on2?' active':'')+'" data-aid="'+a2.id+'" onclick="ProfilesPage.toggleAllergen(\''+a2.id+'\')">' +a2.label+'</button>';
+    }
+    h += '</div>';
+
+    // その他（自由記述）
+    h += '<div class="text-[11px] text-on-surface-variant font-bold mb-1">その他</div>';
+    h += '<input id="pf-allergen-other" class="form-input" value="'+esc(otherText)+'" placeholder="上記以外があればカンマ区切りで入力">';
     h += '</div>';
 
     // 好きな食べ物
@@ -146,7 +192,7 @@ const ProfilesPage = (() => {
       owner_name:     nameEl.value.trim(),
       dob:            document.getElementById('pf-dob')?.value || '',
       gender:         document.getElementById('pf-gender')?.value || '',
-      allergies_food: document.getElementById('pf-allergies')?.value.trim() || '',
+      allergies_food: getAllergiesValue(),
       favorite_foods: document.getElementById('pf-fav')?.value.trim() || '',
       disliked_foods: document.getElementById('pf-dis')?.value.trim() || '',
       // 互換性のため残すが空文字
@@ -241,5 +287,29 @@ const ProfilesPage = (() => {
     }, 100);
   }
 
-  return { render, openAddModal, openEditModal, save, remove, showQRCard };
+  // ── アレルゲン選択UI ──
+  function toggleAllergen(id) {
+    var hidden = document.getElementById('pf-allergen-selected');
+    if (!hidden) return;
+    var arr = hidden.value ? hidden.value.split(',').filter(Boolean) : [];
+    var idx = arr.indexOf(id);
+    if (idx >= 0) arr.splice(idx, 1); else arr.push(id);
+    hidden.value = arr.join(',');
+    // ボタンの見た目を更新
+    document.querySelectorAll('.allergen-toggle-btn').forEach(function(btn) {
+      if (btn.getAttribute('data-aid') === id) {
+        btn.classList.toggle('active', arr.indexOf(id) >= 0);
+      }
+    });
+  }
+
+  function getAllergiesValue() {
+    var hidden = document.getElementById('pf-allergen-selected');
+    var otherEl = document.getElementById('pf-allergen-other');
+    var selected = hidden && hidden.value ? hidden.value.split(',').filter(Boolean) : [];
+    var other = otherEl ? otherEl.value.trim().split(/[,、]/).map(function(s){return s.trim();}).filter(Boolean) : [];
+    return selected.concat(other).join(',');
+  }
+
+  return { render, openAddModal, openEditModal, save, remove, showQRCard, toggleAllergen };
 })();

@@ -6,15 +6,27 @@ const DashboardPage = (() => {
     if (!el) return;
 
     // DB からデータ取得
-    let items = [], adults = 2, children = 0, targetDays = 7;
+    let items = [], targetDays = 7, profiles = [];
     try {
       items      = await DB.Items.getAll();
-      adults     = parseInt(await DB.Settings.get('family_adults', '2')) || 2;
-      children   = parseInt(await DB.Settings.get('family_children', '0')) || 0;
+      profiles   = await DB.Profiles.getAll();
       targetDays = parseInt(await DB.Settings.get('target_days', '7')) || 7;
     } catch(e) {}
 
-    const people = adults + children;
+    // 家族人数をプロフィールの生年月日から自動計算
+    let adults = 0, children = 0;
+    const now = new Date();
+    for (const p of profiles) {
+      if (p.dob) {
+        const bd = new Date(p.dob);
+        let age = now.getFullYear() - bd.getFullYear();
+        if (now.getMonth() < bd.getMonth() || (now.getMonth() === bd.getMonth() && now.getDate() < bd.getDate())) age--;
+        if (age < 12) children++; else adults++;
+      } else {
+        adults++; // 生年月日未設定は大人として計算
+      }
+    }
+    const people = profiles.length || 1; // 0人の場合は1人で計算
 
     // カテゴリ別集計
     const totals = { water:0, food:0, medicine:0, sanitation:0, disaster:0, pet:0, other:0 };
@@ -79,24 +91,32 @@ const DashboardPage = (() => {
         </span>
         <span class="font-headline text-2xl font-bold text-secondary self-end mb-3">日</span>
       </div>
-      <p class="text-on-surface-variant font-medium mt-3 max-w-sm mx-auto text-sm">${statusMsg}</p>
+      <p class="text-on-surface-variant font-medium mt-3 max-w-sm mx-auto text-sm">
+        ${profiles.length ? profiles.map(p => p.owner_name).join('・') + '（' + people + '人）' : '健康カードに家族を登録してください'}
+        ${profiles.length ? '<br>' + statusMsg : ''}
+      </p>
     </section>
 
     <!-- ═══ クイックステータス ═══ -->
-    <div class="grid grid-cols-3 gap-3 mb-8">
-      <div class="bg-surface border border-secondary-container rounded-2xl p-4 text-center">
-        <span class="material-symbols-rounded text-primary mb-1" style="font-variation-settings:'FILL' 1;">inventory_2</span>
-        <div class="font-headline font-bold text-xl text-on-surface">${totalItems}</div>
-        <div class="text-[10px] text-on-surface-variant font-bold">備蓄アイテム</div>
+    <div class="grid grid-cols-4 gap-3 mb-8">
+      <div class="bg-surface border border-secondary-container rounded-2xl p-3 text-center">
+        <span class="material-symbols-rounded text-primary mb-1" style="font-variation-settings:'FILL' 1;">group</span>
+        <div class="font-headline font-bold text-lg text-on-surface">${people}</div>
+        <div class="text-[10px] text-on-surface-variant font-bold">家族</div>
       </div>
-      <div class="bg-surface border border-secondary-container rounded-2xl p-4 text-center ${expiringCount > 0 ? 'border-tertiary/40' : ''}">
+      <div class="bg-surface border border-secondary-container rounded-2xl p-3 text-center">
+        <span class="material-symbols-rounded text-primary mb-1" style="font-variation-settings:'FILL' 1;">inventory_2</span>
+        <div class="font-headline font-bold text-lg text-on-surface">${totalItems}</div>
+        <div class="text-[10px] text-on-surface-variant font-bold">備蓄品</div>
+      </div>
+      <div class="bg-surface border border-secondary-container rounded-2xl p-3 text-center ${expiringCount > 0 ? 'border-tertiary/40' : ''}">
         <span class="material-symbols-rounded ${expiringCount > 0 ? 'text-tertiary' : 'text-primary'} mb-1" style="font-variation-settings:'FILL' 1;">schedule</span>
-        <div class="font-headline font-bold text-xl ${expiringCount > 0 ? 'text-tertiary' : 'text-on-surface'}">${expiringCount}</div>
+        <div class="font-headline font-bold text-lg ${expiringCount > 0 ? 'text-tertiary' : 'text-on-surface'}">${expiringCount}</div>
         <div class="text-[10px] text-on-surface-variant font-bold">期限間近</div>
       </div>
-      <div class="bg-surface border border-secondary-container rounded-2xl p-4 text-center ${expiredCount > 0 ? 'border-error/40' : ''}">
+      <div class="bg-surface border border-secondary-container rounded-2xl p-3 text-center ${expiredCount > 0 ? 'border-error/40' : ''}">
         <span class="material-symbols-rounded ${expiredCount > 0 ? 'text-error' : 'text-primary'} mb-1" style="font-variation-settings:'FILL' 1;">warning</span>
-        <div class="font-headline font-bold text-xl ${expiredCount > 0 ? 'text-error' : 'text-on-surface'}">${expiredCount}</div>
+        <div class="font-headline font-bold text-lg ${expiredCount > 0 ? 'text-error' : 'text-on-surface'}">${expiredCount}</div>
         <div class="text-[10px] text-on-surface-variant font-bold">期限切れ</div>
       </div>
     </div>
@@ -222,7 +242,7 @@ const DashboardPage = (() => {
         </div>
         <div class="text-left">
           <div class="font-bold text-sm">設定</div>
-          <div class="text-[10px] text-on-surface-variant">家族構成・AI設定</div>
+          <div class="text-[10px] text-on-surface-variant">AI・データ管理</div>
         </div>
       </button>
     </div>
