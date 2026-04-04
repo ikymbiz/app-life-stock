@@ -176,7 +176,7 @@ const App = (() => {
       <div style="display:flex;flex-direction:column;gap:8px;">`;
     for (const p of profiles) {
       html += `<button class="btn btn-secondary" onclick="App.showQR(${p.id})">
-        ${p.is_pet ? '🐾' : '👤'} ${Utils.escape(p.owner_name)} の緊急カードを表示</button>`;
+        👤 ${Utils.escape(p.owner_name)} の緊急カードを表示</button>`;
     }
     html += '</div>';
     Modal.open('🆘 緊急カード選択', html);

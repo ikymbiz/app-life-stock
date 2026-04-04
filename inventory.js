@@ -40,7 +40,7 @@ const InventoryPage = (() => {
       const ia = item.allergens.split(',').map(a=>a.trim()).filter(Boolean);
       for (const allergen of ia) {
         for (const p of profiles) {
-          const txt = [p.allergies_food, p.allergies_drug].filter(Boolean).join('、');
+          const txt = (p.allergies_food || '');
           if (txt && txt.includes(allergen)) {
             if (!allergenWarningMap.has(item.id)) allergenWarningMap.set(item.id, []);
             const ex = allergenWarningMap.get(item.id);
