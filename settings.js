@@ -6,14 +6,16 @@ const SettingsPage = (() => {
     if (!el) return;
 
     let aiProvider='none', aiModel='', apiKey='', feedUrl='';
-    let isPremium = false;
+    let isPremium = false, rakutenAppId = '', rakutenAffId = '';
     try {
       aiProvider = await DB.Settings.get('ai_provider','none');
       if (aiProvider !== 'none') {
         aiModel = await DB.Settings.get('ai_model_'+aiProvider, VisionAI.getDefaultModel(aiProvider));
         apiKey  = await DB.Settings.get('ai_key_'+aiProvider, '');
       }
-      feedUrl   = await DB.Settings.get('feed_url', '');
+      feedUrl         = await DB.Settings.get('feed_url', '');
+      rakutenAppId    = await DB.Settings.get('rakuten_app_id', '');
+      rakutenAffId    = await DB.Settings.get('rakuten_affiliate_id', '');
       isPremium = AdMobManager.isPremium();
     } catch(e){}
 
@@ -101,6 +103,17 @@ const SettingsPage = (() => {
     h += '</div>';
     h += '<div id="s-feed-result" class="mt-2 text-xs"></div>';
     h += '<p class="text-[10px] text-on-surface-variant mt-3">GitHub Pages 等で配信している feed.json のURLを入力してください</p>';
+    h += '</div>';
+
+    // ── 楽天設定 ──
+    h += secTitle('storefront','楽天連携');
+    h += '<div class="bg-white border border-secondary-container rounded-2xl overflow-hidden shadow-sm mb-6 p-4">';
+    h += '<label class="block text-xs font-bold text-on-surface-variant mb-1">楽天アプリID（商品検索用）</label>';
+    h += '<input id="s-rakuten-app-id" class="form-input mb-3" value="'+esc(rakutenAppId)+'" placeholder="your-rakuten-app-id">';
+    h += '<label class="block text-xs font-bold text-on-surface-variant mb-1">楽天アフィリエイトID</label>';
+    h += '<input id="s-rakuten-aff-id" class="form-input mb-3" value="'+esc(rakutenAffId)+'" placeholder="your-affiliate-id">';
+    h += '<button onclick="SettingsPage.saveRakutenConfig()" class="w-full py-2.5 rounded-xl bg-primary text-on-primary font-bold text-sm active:scale-95 transition-transform">保存</button>';
+    h += '<p class="text-[10px] text-on-surface-variant mt-2">楽天ウェブサービス（webservice.rakuten.co.jp）でアプリIDを取得してください</p>';
     h += '</div>';
 
     // ── データ管理 ──
@@ -193,6 +206,16 @@ const SettingsPage = (() => {
     }
   }
 
+  async function saveRakutenConfig() {
+    const appId = document.getElementById('s-rakuten-app-id')?.value.trim() || '';
+    const affId = document.getElementById('s-rakuten-aff-id')?.value.trim() || '';
+    await Promise.all([
+      DB.Settings.set('rakuten_app_id', appId),
+      DB.Settings.set('rakuten_affiliate_id', affId),
+    ]);
+    Toast.success('✅ 楽天設定を保存しました');
+  }
+
   async function purchasePremium() {
     await BillingManager.purchase();
     render();
@@ -212,5 +235,5 @@ const SettingsPage = (() => {
 
   return {render,onProviderChange,onModelChange,toggleKey,saveKey,testKey,exportData,importData,clearAll,
     selectProvider,selectModel,toggleKeyVisibility,saveApiKey,testConnection,
-    saveFeedUrl,testFeed,purchasePremium,restorePurchase};
+    saveFeedUrl,testFeed,saveRakutenConfig,purchasePremium,restorePurchase};
 })();

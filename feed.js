@@ -317,5 +317,5 @@ const FeedPage = (() => {
     </div>`;
   }
 
-  return { render, getDeals, dealCardCompactHTML, _getFamilyAllergens, _refresh };
+  return { render, getDeals, dealCardCompactHTML, _getFamilyAllergens, _fetchFeedPublic: _fetchFeed, _refresh };
 })();

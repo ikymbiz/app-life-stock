@@ -1,7 +1,7 @@
 /* db.js — LifeStock IndexedDB v3 */
 const DB = (() => {
   const DB_NAME = 'lifestockDB';
-  const DB_VER  = 3;
+  const DB_VER  = 4;
   let db = null;
 
   async function init() {
@@ -59,6 +59,26 @@ const DB = (() => {
                 item.volume_unit = null;
                 delete item.unit;
                 itemStore.put(item);
+              }
+            };
+          }
+        }
+
+        if (old < 4) {
+          // 楽天商品キャッシュ専用ストア（settings ストアとは分離）
+          // エクスポート・インポート・全削除の対象外とする
+          d.createObjectStore('product_cache', { keyPath: 'key' });
+
+          // v3 以前に settings ストアに混入していた rakuten_products:* キーを移行
+          if (old >= 1) {
+            const settingsStore = t.objectStore('settings');
+            settingsStore.getAll().onsuccess = (ev) => {
+              const cacheStore = t.objectStore('product_cache');
+              for (const rec of (ev.target.result || [])) {
+                if (rec.key && rec.key.startsWith('rakuten_products:')) {
+                  cacheStore.put({ key: rec.key, value: rec.value });
+                  settingsStore.delete(rec.key);
+                }
               }
             };
           }
@@ -188,6 +208,20 @@ const DB = (() => {
     getAll: ()     => getAll('settings'),
   };
 
+  // 楽天商品キャッシュ専用（エクスポート・インポート・全削除の対象外）
+  const ProductCache = {
+    get: async (key) => {
+      try { const r = await get('product_cache', key); return r ? r.value : null; } catch { return null; }
+    },
+    set: (key, value) => put('product_cache', { key, value }),
+    clear: async () => {
+      await new Promise((res, rej) => {
+        const r = getStore('product_cache', 'readwrite').clear();
+        r.onsuccess = res; r.onerror = rej;
+      });
+    },
+  };
+
   async function exportAll() {
     return {
       version:     DB_VER,
@@ -197,11 +231,13 @@ const DB = (() => {
       profiles:    await getAll('profiles'),
       shopping:    await getAll('shopping_list'),
       settings:    await getAll('settings'),
+      // product_cache は除外（一時キャッシュのため）
     };
   }
 
   async function importAll(data) {
     if (!data || !data.items) throw new Error('Invalid backup');
+    // product_cache は上書きしない（既存キャッシュを保持）
     for (const store of ['items', 'item_stocks', 'item_images', 'profiles', 'shopping_list', 'settings']) {
       await new Promise((res, rej) => { const r = getStore(store, 'readwrite').clear(); r.onsuccess = res; r.onerror = rej; });
     }
@@ -212,5 +248,5 @@ const DB = (() => {
     for (const x of (data.settings    || [])) await put('settings', x);
   }
 
-  return { init, Items, ItemStocks, ItemImages, Profiles, Shopping, Settings, exportAll, importAll };
+  return { init, Items, ItemStocks, ItemImages, Profiles, Shopping, Settings, ProductCache, exportAll, importAll };
 })();
