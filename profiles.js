@@ -74,6 +74,21 @@ const ProfilesPage = (() => {
 
   function esc(s) { return Utils.escape(s || ''); }
 
+  // ── 生年月日 入力ヘルパー ──
+  function _fmtDob(el) {
+    const d = el.value.replace(/\D/g, '').slice(0, 8);
+    let v = d;
+    if (d.length > 6) v = d.slice(0,4)+'/'+d.slice(4,6)+'/'+d.slice(6);
+    else if (d.length > 4) v = d.slice(0,4)+'/'+d.slice(4);
+    el.value = v;
+  }
+  function _dobToISO(v) {
+    const d = v.replace(/\D/g, '');
+    if (d.length === 8) return d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8);
+    return '';
+  }
+  function _isoToDob(iso) { return iso ? iso.replace(/-/g, '/') : ''; }
+
   function calcAge(dob) {
     try {
       var d = new Date(dob), now = new Date();
@@ -103,7 +118,7 @@ const ProfilesPage = (() => {
     // 生年月日・性別
     h += '<div class="form-row">';
     h += '<div class="form-group"><label class="form-label">生年月日</label>';
-    h += '<input id="pf-dob" type="date" class="form-input" value="'+v('dob')+'"></div>';
+    h += '<input id="pf-dob" type="text" inputmode="numeric" maxlength="10" class="form-input" value="'+_isoToDob(edit ? (p.dob||'') : '')+'" placeholder="YYYYMMDD" oninput="ProfilesPage._fmtDob(this)"></div>';
     h += '<div class="form-group"><label class="form-label">性別</label>';
     h += '<select id="pf-gender" class="form-select">';
     h += '<option value="">未設定</option>';
@@ -190,7 +205,7 @@ const ProfilesPage = (() => {
 
     var data = {
       owner_name:     nameEl.value.trim(),
-      dob:            document.getElementById('pf-dob')?.value || '',
+      dob:            _dobToISO(document.getElementById('pf-dob')?.value || ''),
       gender:         document.getElementById('pf-gender')?.value || '',
       allergies_food: getAllergiesValue(),
       favorite_foods: document.getElementById('pf-fav')?.value.trim() || '',
@@ -245,7 +260,7 @@ const ProfilesPage = (() => {
     var sub = [];
     if (p.gender) sub.push(p.gender);
     if (age !== null) sub.push(age + '歳');
-    if (p.dob) sub.push(p.dob);
+    if (p.dob) sub.push(_isoToDob(p.dob));
     h += '<div class="text-xs text-on-surface-variant">'+sub.join(' · ')+'</div>';
     h += '</div>';
 
@@ -311,5 +326,5 @@ const ProfilesPage = (() => {
     return selected.concat(other).join(',');
   }
 
-  return { render, openAddModal, openEditModal, save, remove, showQRCard, toggleAllergen };
+  return { render, openAddModal, openEditModal, save, remove, showQRCard, toggleAllergen, _fmtDob };
 })();

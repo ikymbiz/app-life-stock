@@ -5,13 +5,14 @@ const SettingsPage = (() => {
     const el = document.getElementById('page-settings');
     if (!el) return;
 
-    let aiProvider='none', aiModel='', apiKey='';
+    let aiProvider='none', aiModel='', apiKey='', feedUrl='';
     try {
       aiProvider = await DB.Settings.get('ai_provider','none');
       if (aiProvider !== 'none') {
         aiModel = await DB.Settings.get('ai_model_'+aiProvider, VisionAI.getDefaultModel(aiProvider));
         apiKey  = await DB.Settings.get('ai_key_'+aiProvider, '');
       }
+      feedUrl = await DB.Settings.get('feed_url', '');
     } catch(e){}
 
     var scanCount = 0, costPer = 0;
@@ -64,6 +65,19 @@ const SettingsPage = (() => {
       var lk=links[aiProvider];
       if(lk) h+='<a href="'+lk[0]+'" target="_blank" class="flex items-center gap-2 mt-3 text-xs text-primary font-bold"><span class="material-symbols-rounded text-sm">open_in_new</span> '+lk[1]+'</a>';
     }
+    h += '</div>';
+
+    // ── フィード ──
+    h += secTitle('newspaper','フィード配信');
+    h += '<div class="bg-white border border-secondary-container rounded-2xl overflow-hidden shadow-sm mb-6 p-4">';
+    h += '<label class="block text-xs font-bold text-on-surface-variant mb-2">フィードURL</label>';
+    h += '<input id="s-feed-url" class="form-input" type="url" value="'+esc(feedUrl)+'" placeholder="https://example.github.io/lifestock-feed/feed.json">';
+    h += '<div class="flex gap-2 mt-3">';
+    h += '<button onclick="SettingsPage.saveFeedUrl()" class="flex-1 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-sm active:scale-95 transition-transform">保存</button>';
+    h += '<button onclick="SettingsPage.testFeed()" class="flex-1 py-2.5 rounded-xl border border-primary/20 text-primary font-bold text-sm active:scale-95 transition-transform">接続テスト</button>';
+    h += '</div>';
+    h += '<div id="s-feed-result" class="mt-2 text-xs"></div>';
+    h += '<p class="text-[10px] text-on-surface-variant mt-3">GitHub Pages 等で配信している feed.json のURLを入力してください</p>';
     h += '</div>';
 
     // ── データ管理 ──
@@ -134,6 +148,28 @@ const SettingsPage = (() => {
     try{await DB.importAll({items:[],item_stocks:[],profiles:[],shopping:[],settings:[]});Toast.success('削除しました');render();}catch(e){Toast.error('削除失敗');}
   }
 
+  async function saveFeedUrl() {
+    const url = document.getElementById('s-feed-url')?.value.trim() || '';
+    await DB.Settings.set('feed_url', url);
+    Toast.success('✅ フィードURLを保存しました');
+  }
+
+  async function testFeed() {
+    const url = document.getElementById('s-feed-url')?.value.trim();
+    const resEl = document.getElementById('s-feed-result');
+    if (!url) { if (resEl) resEl.innerHTML = '<span style="color:var(--red);">URLを入力してください</span>'; return; }
+    if (resEl) resEl.innerHTML = '⏳ 接続中...';
+    try {
+      const res = await fetch(url + '?t=' + Date.now());
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const count = (data.items || []).length;
+      if (resEl) resEl.innerHTML = `<span style="color:var(--green);">✅ 接続成功（${count}件）</span>`;
+    } catch (e) {
+      if (resEl) resEl.innerHTML = `<span style="color:var(--red);">❌ 失敗: ${Utils.escape(e.message)}</span>`;
+    }
+  }
+
   // 互換用
   async function selectProvider(id){await onProviderChange(id);}
   async function selectModel(p,m){await DB.Settings.set('ai_model_'+p,m);}
@@ -142,5 +178,6 @@ const SettingsPage = (() => {
   async function testConnection(){await testKey();}
 
   return {render,onProviderChange,onModelChange,toggleKey,saveKey,testKey,exportData,importData,clearAll,
-    selectProvider,selectModel,toggleKeyVisibility,saveApiKey,testConnection};
+    selectProvider,selectModel,toggleKeyVisibility,saveApiKey,testConnection,
+    saveFeedUrl,testFeed};
 })();

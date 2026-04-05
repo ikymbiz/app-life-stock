@@ -24,22 +24,38 @@ const InventoryPage = (() => {
   const VOLUME_UNITS = ['L','mL','kg','g','カップ'];
   const LOCATIONS    = ['玄関','キッチン','食品庫','寝室','リビング','クローゼット','床下収納','車内','ベランダ','その他'];
 
+  // 特定原材料8品目＋準ずるもの20品目＝計28品目（2024年現在の公式リスト）
   const ALLERGEN_LIST = [
-    { id:'小麦',   label:'🌾 小麦',   major:true }, { id:'卵',     label:'🥚 卵',     major:true },
-    { id:'乳',     label:'🥛 乳',     major:true }, { id:'そば',   label:'🍜 そば',   major:true },
-    { id:'落花生', label:'🥜 落花生', major:true }, { id:'えび',   label:'🦐 えび',   major:true },
-    { id:'かに',   label:'🦀 かに',   major:true }, { id:'くるみ', label:'🌰 くるみ', major:true },
-    { id:'アーモンド',label:'アーモンド' }, { id:'あわび',      label:'あわび'        },
-    { id:'いか',        label:'いか'        }, { id:'いくら',      label:'いくら'        },
-    { id:'オレンジ',    label:'🍊 オレンジ' }, { id:'カシューナッツ',label:'カシューナッツ'},
-    { id:'キウイ',      label:'🥝 キウイ'   }, { id:'牛肉',        label:'🥩 牛肉'      },
-    { id:'ごま',        label:'ごま'        }, { id:'さけ',        label:'さけ'          },
-    { id:'さば',        label:'さば'        }, { id:'大豆',        label:'大豆'          },
-    { id:'鶏肉',        label:'鶏肉'        }, { id:'豚肉',        label:'豚肉'          },
-    { id:'バナナ',      label:'🍌 バナナ'   }, { id:'もも',        label:'🍑 もも'       },
-    { id:'やまいも',    label:'やまいも'    }, { id:'りんご',      label:'🍎 りんご'     },
-    { id:'ゼラチン',    label:'ゼラチン'    }, { id:'マカダミアナッツ',label:'マカダミア' },
-    { id:'まつたけ',    label:'まつたけ'    }, { id:'ピーナッツ',  label:'🥜 ピーナッツ' },
+    // 特定原材料 8品目（major: true）
+    { id:'小麦',           label:'🌾 小麦',           major:true },
+    { id:'卵',             label:'🥚 卵',             major:true },
+    { id:'乳',             label:'🥛 乳',             major:true },
+    { id:'そば',           label:'🍜 そば',           major:true },
+    { id:'落花生',         label:'🥜 落花生',         major:true },
+    { id:'えび',           label:'🦐 えび',           major:true },
+    { id:'かに',           label:'🦀 かに',           major:true },
+    { id:'くるみ',         label:'🌰 くるみ',         major:true },
+    // 特定原材料に準ずるもの 20品目
+    { id:'アーモンド',     label:'アーモンド'         },
+    { id:'あわび',         label:'あわび'             },
+    { id:'いか',           label:'いか'               },
+    { id:'いくら',         label:'いくら'             },
+    { id:'オレンジ',       label:'🍊 オレンジ'        },
+    { id:'カシューナッツ', label:'カシューナッツ'     },
+    { id:'キウイ',         label:'🥝 キウイ'          },
+    { id:'牛肉',           label:'🥩 牛肉'            },
+    { id:'ごま',           label:'ごま'               },
+    { id:'さけ',           label:'さけ'               },
+    { id:'さば',           label:'さば'               },
+    { id:'大豆',           label:'大豆'               },
+    { id:'鶏肉',           label:'鶏肉'               },
+    { id:'豚肉',           label:'豚肉'               },
+    { id:'バナナ',         label:'🍌 バナナ'          },
+    { id:'もも',           label:'🍑 もも'            },
+    { id:'やまいも',       label:'やまいも'           },
+    { id:'りんご',         label:'🍎 りんご'          },
+    { id:'ゼラチン',       label:'ゼラチン'           },
+    { id:'マカダミアナッツ',label:'マカダミアナッツ'  },
   ];
 
   // ── アレルゲン照合 ──
@@ -682,8 +698,15 @@ const InventoryPage = (() => {
           ? existing.map(a => `<span class="allergen-chip-selected" onclick="InventoryPage.toggleAllergen('${a}')">${a} ✕</span>`).join('')
           : '<span style="color:var(--txt-3);font-size:12px;">なし</span>'}
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px;">
+      <div style="font-size:11px;color:var(--txt-3);font-weight:700;margin-bottom:4px;">特定原材料（8品目）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
         ${ALLERGEN_LIST.filter(a => a.major).map(a =>
+          `<button type="button" class="allergen-toggle-btn ${existing.includes(a.id) ? 'active' : ''}" data-id="${a.id}" onclick="InventoryPage.toggleAllergen('${a.id}')">${a.label}</button>`
+        ).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--txt-3);font-weight:700;margin-bottom:4px;">準ずるもの（20品目）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">
+        ${ALLERGEN_LIST.filter(a => !a.major).map(a =>
           `<button type="button" class="allergen-toggle-btn ${existing.includes(a.id) ? 'active' : ''}" data-id="${a.id}" onclick="InventoryPage.toggleAllergen('${a.id}')">${a.label}</button>`
         ).join('')}
       </div>

@@ -71,7 +71,70 @@ const ShoppingPage = (() => {
         <span class="section-title">✅ 購入済み</span>
       </div>
       ${bought.map(item => shoppingItemHTML(item)).join('')}` : ''}
+
+      <!-- お得情報（非同期で後付け） -->
+      <div id="shopping-deals"></div>
     </div>`;
+
+    _loadDeals(shopping);
+  }
+
+  async function _loadDeals(shopping) {
+    const dealsEl = document.getElementById('shopping-deals');
+    if (!dealsEl) return;
+    try {
+      const [deals, familyAllergens] = await Promise.all([
+        FeedPage.getDeals(),
+        FeedPage._getFamilyAllergens(),
+      ]);
+      if (!deals.length) return;
+
+      let html = '';
+
+      // ── Section 1: 関連お得情報（買い物リストのアイテムと tag 照合）──
+      const shopNames = shopping.map(s => s.name.toLowerCase());
+      const scored = deals.map(deal => {
+        const tags = (deal.tags || []).map(t => t.toLowerCase());
+        const score = tags.reduce((s, t) => s + (shopNames.some(n => n.includes(t) || t.includes(n)) ? 1 : 0), 0);
+        return { deal, score };
+      });
+      const top = scored.sort((a, b) => b.score - a.score).slice(0, 3).map(x => x.deal);
+
+      if (top.length) {
+        html += `
+          <div class="section-header" style="margin-top:20px;">
+            <span class="section-title">🏷️ 関連お得情報</span>
+            <button class="section-action" onclick="App.navigate('feed')">すべて見る →</button>
+          </div>
+          ${top.map(d => FeedPage.dealCardCompactHTML(d, familyAllergens, false)).join('')}`;
+      }
+
+      // ── Section 2: アレルギー配慮おすすめ（家族にアレルゲンがある場合のみ）──
+      if (familyAllergens.size) {
+        // allergen_free フィールドに家族のアレルゲンが含まれる deal を優先
+        const allergenDeals = deals
+          .filter(d => {
+            const freeFor = d.allergen_free || [];
+            return [...familyAllergens].some(a => freeFor.includes(a));
+          })
+          .filter(d => !top.includes(d)) // 関連お得情報と重複排除
+          .slice(0, 3);
+
+        if (allergenDeals.length) {
+          const allergenNames = [...familyAllergens].join('・');
+          html += `
+            <div class="section-header" style="margin-top:20px;">
+              <span class="section-title">✅ アレルギー配慮おすすめ</span>
+            </div>
+            <div style="font-size:12px;color:var(--txt-3);margin-bottom:10px;">
+              ${allergenNames}を避けた商品のご提案
+            </div>
+            ${allergenDeals.map(d => FeedPage.dealCardCompactHTML(d, familyAllergens, true)).join('')}`;
+        }
+      }
+
+      if (html) dealsEl.innerHTML = html;
+    } catch { /* フィード未設定時は無視 */ }
   }
 
   function shoppingItemHTML(item) {

@@ -124,6 +124,7 @@ const App = (() => {
     inventory:  { module: () => InventoryPage, label: '備蓄品' },
     profiles:   { module: () => ProfilesPage, label: '健康カード' },
     shopping:   { module: () => ShoppingPage, label: '買い物リスト' },
+    feed:       { module: () => FeedPage,     label: 'フィード' },
     settings:   { module: () => SettingsPage, label: '設定' },
   };
 

@@ -31,7 +31,8 @@ const VisionAI = (() => {
 - name: 商品名・品名。パッケージ正面から読み取れ。ブランド名は含めなくてよい。読み取れない場合はnull。
 - category: water/food/medicine/sanitation/disaster/pet/other から最も適切な1つ。
 - expiry: 賞味期限または消費期限をYYYY-MM-DD形式で。年月のみの場合はその月の1日。読み取れない場合はnull。
-- allergens: 成分表・原材料欄から日本の特定原材料およびそれに準ずるものを全て配列で。なければ空配列。
+- allergens: 成分表・原材料欄から以下の28品目に含まれるものだけを配列で返せ。なければ空配列。
+  対象: 小麦/卵/乳/そば/落花生/えび/かに/くるみ/アーモンド/あわび/いか/いくら/オレンジ/カシューナッツ/キウイ/牛肉/ごま/さけ/さば/大豆/鶏肉/豚肉/バナナ/もも/やまいも/りんご/ゼラチン/マカダミアナッツ
 - count: 箱・袋・パックの中に入っている個数・本数・入数を整数で。読み取れない場合はnull。
 - count_unit: 個/本/袋/缶/箱/食/枚/セット から最も適切なもの。
 - volume: 1つあたりの容量・重量の数値のみ（例: 2、500）。容量表記がない場合はnull。
@@ -40,7 +41,7 @@ const VisionAI = (() => {
 {"name":string|null,"category":string,"expiry":string|null,"allergens":string[],"count":number|null,"count_unit":string,"volume":number|null,"volume_unit":string|null}`,
 
     expiry:   'この食品の賞味期限/消費期限を読み取れ。JSONのみ返せ。コードブロック不要。\n{"expiry_date":"YYYY-MM-DD or null"}',
-    allergens:'この食品の成分表からアレルゲンを特定せよ。日本の特定原材料と準ずるもの。JSONのみ返せ。コードブロック不要。\n{"allergens":["小麦","卵","乳"]}',
+    allergens:'この食品の成分表から以下の28品目に該当するアレルゲンを全て返せ。JSONのみ返せ。コードブロック不要。\n対象: 小麦/卵/乳/そば/落花生/えび/かに/くるみ/アーモンド/あわび/いか/いくら/オレンジ/カシューナッツ/キウイ/牛肉/ごま/さけ/さば/大豆/鶏肉/豚肉/バナナ/もも/やまいも/りんご/ゼラチン/マカダミアナッツ\n{"allergens":["小麦","卵","乳"]}',
     full:     'この食品パッケージの情報を読み取れ。JSONのみ返せ。コードブロック不要。\n{"name":"商品名 or null","expiry_date":"YYYY-MM-DD or null","allergens":["アレルゲン名"]}',
   };
 
@@ -134,6 +135,12 @@ const VisionAI = (() => {
       }
 
       if (!Array.isArray(obj.allergens)) obj.allergens = [];
+      // 28品目リストに含まれるもののみ通す
+      const VALID_ALLERGENS = new Set(['小麦','卵','乳','そば','落花生','えび','かに','くるみ',
+        'アーモンド','あわび','いか','いくら','オレンジ','カシューナッツ','キウイ','牛肉',
+        'ごま','さけ','さば','大豆','鶏肉','豚肉','バナナ','もも','やまいも','りんご',
+        'ゼラチン','マカダミアナッツ']);
+      obj.allergens = obj.allergens.filter(a => VALID_ALLERGENS.has(a));
 
       const vc = ['water', 'food', 'medicine', 'sanitation', 'disaster', 'pet', 'other'];
       if (obj.category && !vc.includes(obj.category)) obj.category = null;
