@@ -35,7 +35,7 @@ const DashboardPage = (() => {
 
     for (const item of items) {
       const cat = item.category || 'other';
-      const qty = item.total_qty || 0;
+      const qty = item.total_count || 0;
       if (totals[cat] !== undefined) totals[cat] += qty;
 
       if (item.nearest_expiry) {

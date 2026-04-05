@@ -9,7 +9,7 @@ const ShoppingPage = (() => {
 
     // Auto-suggest low stock items
     const suggestions = items.filter(i =>
-      i.min_qty > 0 && i.qty < i.min_qty &&
+      i.min_qty > 0 && i.total_count < i.min_qty &&
       !shopping.some(s => s.name === i.name && !s.is_bought)
     );
 
@@ -41,7 +41,7 @@ const ShoppingPage = (() => {
           <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
             <div>
               <div style="font-size:14px;font-weight:600;">${Utils.escape(i.name)}</div>
-              <div style="font-size:12px;color:var(--txt-3);">在庫 ${i.qty}${i.unit} / 目標 ${i.min_qty}${i.unit}</div>
+              <div style="font-size:12px;color:var(--txt-3);">在庫 ${i.total_count}${i.count_unit || '個'} / 目標 ${i.min_qty}${i.count_unit || '個'}</div>
             </div>
             <button class="btn btn-sm" style="background:var(--amber);color:white;"
               onclick="ShoppingPage.addSuggestion(${i.id})">追加</button>
@@ -104,7 +104,7 @@ const ShoppingPage = (() => {
         <div class="form-group">
           <label class="form-label">単位</label>
           <select id="s-unit" class="form-select">
-            ${['個','本','袋','缶','箱','L','枚','食','セット'].map(u=>`<option>${u}</option>`).join('')}
+            ${['個','本','袋','缶','箱','枚','食','セット'].map(u=>`<option>${u}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -131,8 +131,8 @@ const ShoppingPage = (() => {
     if (!item) return;
     await DB.Shopping.add({
       name: item.name,
-      qty_needed: item.min_qty - item.qty,
-      unit: item.unit,
+      qty_needed: item.min_qty - item.total_count,
+      unit: item.count_unit || '個',
     });
     Toast.success('🛒 リストに追加しました');
     render();
