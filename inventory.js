@@ -353,8 +353,8 @@ const InventoryPage = (() => {
     h += `<div class="form-group"><label class="form-label">数量</label>
       <input id="qf-count" type="number" class="form-input" value="${count}" min="0.5" step="0.5"></div>`;
     h += `<div class="form-group"><label class="form-label">賞味期限</label>
-      <input id="qf-expiry" type="date" class="form-input" value="${expiry}">
-      ${expiry ? `<div style="margin-top:3px;font-size:11px;" class="${Utils.expiryClass(expiry)}">${Utils.expiryLabel(expiry)}</div>` : ''}</div>`;
+      <input type="text" inputmode="numeric" id="qf-expiry" class="form-input" value="${_isoToDisplay(expiry)}" placeholder="YYYYMMDD" maxlength="10" oninput="InventoryPage._fmtExpiryInput(this)">
+      <div id="qf-expiry-badge" style="margin-top:3px;font-size:11px;" class="${expiry ? Utils.expiryClass(expiry) : ''}">${expiry ? Utils.expiryLabel(expiry) : ''}</div></div>`;
     h += '</div>';
 
     h += '<div class="form-row">';
@@ -389,7 +389,7 @@ const InventoryPage = (() => {
     if (!nameEl || !nameEl.value.trim()) { Toast.error('品名を入力してください'); return; }
     const count       = parseFloat(document.getElementById('qf-count')?.value) || 1;
     const count_unit  = document.getElementById('qf-count-unit')?.value || '個';
-    const expiry      = document.getElementById('qf-expiry')?.value || '';
+    const expiry      = _displayToISO(document.getElementById('qf-expiry')?.value || '');
     const volVal      = parseFloat(document.getElementById('qf-volume')?.value);
     const volume      = (volVal > 0) ? volVal : null;
     const volume_unit = volume ? (document.getElementById('qf-volume-unit')?.value || null) : null;
@@ -417,7 +417,7 @@ const InventoryPage = (() => {
     const category    = document.getElementById('qf-category')?.value    || 'other';
     const count_unit  = document.getElementById('qf-count-unit')?.value  || '個';
     const count       = parseFloat(document.getElementById('qf-count')?.value) || 1;
-    const expiry      = document.getElementById('qf-expiry')?.value      || '';
+    const expiry      = _displayToISO(document.getElementById('qf-expiry')?.value || '');
     const location    = document.getElementById('qf-location')?.value    || '';
     const volVal      = parseFloat(document.getElementById('qf-volume')?.value);
     const volume      = (volVal > 0) ? volVal : null;
@@ -458,6 +458,36 @@ const InventoryPage = (() => {
       };
       img.onerror = () => { URL.revokeObjectURL(url); resolve(null); }; img.src = url;
     });
+  }
+
+  // ── 賞味期限 入力ヘルパー ──
+  // YYYY-MM-DD ↔ YYYY/MM/DD 変換
+  function _isoToDisplay(iso) { return iso ? iso.replace(/-/g, '/') : ''; }
+  function _displayToISO(v) {
+    const d = v.replace(/\D/g, '');
+    if (d.length === 8) return d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8);
+    if (d.length === 6) return d.slice(0,4)+'-'+d.slice(4,6)+'-01';
+    return '';
+  }
+  // 数字入力 → YYYY/MM/DD に自動整形
+  function _fmtExpiryInput(el) {
+    const d = el.value.replace(/\D/g, '').slice(0, 8);
+    let v = d;
+    if (d.length > 6) v = d.slice(0,4)+'/'+d.slice(4,6)+'/'+d.slice(6);
+    else if (d.length > 4) v = d.slice(0,4)+'/'+d.slice(4);
+    el.value = v;
+  }
+  // 在庫エントリーの期限入力用（フォーマット＋バッジ更新）
+  function _onStockExpiryInput(el, idx) {
+    _fmtExpiryInput(el);
+    const iso = _displayToISO(el.value);
+    if (currentStockEntries[idx]) currentStockEntries[idx].expiry_date = iso;
+    const badge = document.getElementById('se-expiry-badge-'+idx);
+    if (badge) {
+      badge.className = iso ? Utils.expiryClass(iso) : '';
+      badge.style.fontSize = '11px'; badge.style.marginTop = '3px';
+      badge.textContent = iso ? Utils.expiryLabel(iso) : '';
+    }
   }
 
   function renderPhotos() {
@@ -513,7 +543,12 @@ const InventoryPage = (() => {
       for (let i = 0; i < currentStockEntries.length; i++) {
         if (!currentStockEntries[i].expiry_date) {
           currentStockEntries[i].expiry_date = result.expiry_date;
-          const el = document.getElementById('se-expiry-' + i); if (el) el.value = result.expiry_date;
+          const el = document.getElementById('se-expiry-' + i);
+          if (el) {
+            el.value = _isoToDisplay(result.expiry_date);
+            const badge = document.getElementById('se-expiry-badge-' + i);
+            if (badge) { badge.className = Utils.expiryClass(result.expiry_date); badge.style.fontSize = '11px'; badge.style.marginTop = '3px'; badge.textContent = Utils.expiryLabel(result.expiry_date); }
+          }
           filled = true; break;
         }
       }
@@ -562,15 +597,14 @@ const InventoryPage = (() => {
     el.innerHTML = currentStockEntries.map((entry, idx) => `<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:8px;">
       <div style="flex:1;"><div style="display:flex;gap:6px;align-items:center;">
         <input type="number" id="se-count-${idx}" value="${entry.count || ''}" min="0.5" step="0.5" class="form-input" style="width:80px;" placeholder="数量" oninput="InventoryPage.syncStock(${idx},'count',this.value)">
-        <input type="date"   id="se-expiry-${idx}" value="${entry.expiry_date || ''}" class="form-input" style="flex:1;" oninput="InventoryPage.syncStock(${idx},'expiry_date',this.value)">
-      </div>${entry.expiry_date ? `<div style="margin-top:3px;font-size:11px;" class="${Utils.expiryClass(entry.expiry_date)}">${Utils.expiryLabel(entry.expiry_date)}</div>` : ''}</div>
+        <input type="text" inputmode="numeric" id="se-expiry-${idx}" value="${_isoToDisplay(entry.expiry_date)}" placeholder="YYYYMMDD" maxlength="10" class="form-input" style="flex:1;" oninput="InventoryPage._onStockExpiryInput(this,${idx})">
+      </div><div id="se-expiry-badge-${idx}" style="margin-top:3px;font-size:11px;" class="${entry.expiry_date ? Utils.expiryClass(entry.expiry_date) : ''}">${entry.expiry_date ? Utils.expiryLabel(entry.expiry_date) : ''}</div></div>
       <button type="button" onclick="InventoryPage.removeStockEntry(${idx})" style="flex-shrink:0;background:var(--red-dim);border:1px solid var(--red-border);color:var(--red);border-radius:6px;padding:7px 10px;cursor:pointer;font-size:13px;margin-top:2px;">✕</button>
     </div>`).join('');
   }
   function syncStock(idx, field, val) {
     if (!currentStockEntries[idx]) return;
     currentStockEntries[idx][field] = field === 'count' ? parseFloat(val) || 0 : val;
-    if (field === 'expiry_date') setTimeout(() => renderStockEntries(), 30);
   }
   function addStockEntry()       { currentStockEntries.push({ id: null, count: 1, expiry_date: '', note: '' }); renderStockEntries(); }
   function removeStockEntry(idx) { currentStockEntries.splice(idx, 1); renderStockEntries(); }
@@ -718,7 +752,7 @@ const InventoryPage = (() => {
       const qEl = document.getElementById('se-count-' + idx);
       const eEl = document.getElementById('se-expiry-' + idx);
       if (qEl) entry.count = parseFloat(qEl.value) || 0;
-      if (eEl) entry.expiry_date = eEl.value || '';
+      if (eEl) entry.expiry_date = _displayToISO(eEl.value) || '';
     });
     const volVal      = parseFloat(document.getElementById('f-volume')?.value);
     const volume      = (volVal > 0) ? volVal : null;
@@ -767,6 +801,7 @@ const InventoryPage = (() => {
     addStagingPhoto, toggleStagingCheck, removeStagingPhoto, runStagingAnalysis,
     openAddModal, openEditModal, saveItem, deleteItem, addToShopping,
     addStockEntry, removeStockEntry, syncStock,
+    _fmtExpiryInput, _onStockExpiryInput,
     triggerVisionScan, addPhoto, removePhoto,
     toggleAllergen, renderAllergenUI, getAllergenWarnings,
   };
