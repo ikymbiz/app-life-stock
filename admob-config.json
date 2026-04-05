@@ -1,0 +1,30 @@
+{
+  "_comment": "本番運用前に prod の値を AdMob 管理画面の実際のIDに差し替えてください",
+
+  "android": {
+    "app_id": {
+      "test": "ca-app-pub-3940256099942544~3347511713",
+      "prod": "ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX"
+    },
+    "banner": {
+      "dashboard": {
+        "test": "ca-app-pub-3940256099942544/6300978111",
+        "prod": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+      },
+      "inventory": {
+        "test": "ca-app-pub-3940256099942544/6300978111",
+        "prod": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+      },
+      "shopping": {
+        "test": "ca-app-pub-3940256099942544/6300978111",
+        "prod": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+      },
+      "feed": {
+        "test": "ca-app-pub-3940256099942544/6300978111",
+        "prod": "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX"
+      }
+    }
+  },
+
+  "_test_mode": true
+}

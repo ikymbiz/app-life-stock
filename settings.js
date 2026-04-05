@@ -6,13 +6,15 @@ const SettingsPage = (() => {
     if (!el) return;
 
     let aiProvider='none', aiModel='', apiKey='', feedUrl='';
+    let isPremium = false;
     try {
       aiProvider = await DB.Settings.get('ai_provider','none');
       if (aiProvider !== 'none') {
         aiModel = await DB.Settings.get('ai_model_'+aiProvider, VisionAI.getDefaultModel(aiProvider));
         apiKey  = await DB.Settings.get('ai_key_'+aiProvider, '');
       }
-      feedUrl = await DB.Settings.get('feed_url', '');
+      feedUrl   = await DB.Settings.get('feed_url', '');
+      isPremium = AdMobManager.isPremium();
     } catch(e){}
 
     var scanCount = 0, costPer = 0;
@@ -20,6 +22,27 @@ const SettingsPage = (() => {
     var costTotal = Math.round(scanCount * costPer * 100) / 100;
 
     var h = '';
+
+    // ── プレミアム ──
+    if (AdMobManager.isNative()) {
+      h += secTitle('workspace_premium', 'プレミアム');
+      if (isPremium) {
+        h += '<div class="bg-white border border-secondary-container rounded-2xl p-4 mb-6">';
+        h += '<div class="flex items-center gap-3">';
+        h += '<span class="material-symbols-rounded text-primary text-2xl" style="font-variation-settings:\'FILL\' 1;">workspace_premium</span>';
+        h += '<div><div class="font-bold text-sm">プレミアム利用中</div>';
+        h += '<div class="text-xs text-on-surface-variant">広告は非表示になっています</div></div></div>';
+        h += '</div>';
+      } else {
+        h += '<div class="bg-white border border-secondary-container rounded-2xl overflow-hidden shadow-sm mb-6">';
+        h += '<div class="p-4">';
+        h += '<div class="font-bold text-sm mb-1">✨ LifeStock プレミアム</div>';
+        h += '<div class="text-xs text-on-surface-variant mb-3">広告を非表示にする買い切りプランです</div>';
+        h += '<button onclick="SettingsPage.purchasePremium()" class="w-full py-3 rounded-xl bg-primary text-on-primary font-bold text-sm active:scale-95 transition-transform mb-2">購入する</button>';
+        h += '<button onclick="SettingsPage.restorePurchase()" class="w-full py-2.5 rounded-xl border border-primary/20 text-primary font-bold text-sm active:scale-95 transition-transform">購入を復元する</button>';
+        h += '</div></div>';
+      }
+    }
 
     // ── AI設定 ──
     h += secTitle('smart_toy', 'AI写真解析');
@@ -170,6 +193,16 @@ const SettingsPage = (() => {
     }
   }
 
+  async function purchasePremium() {
+    await BillingManager.purchase();
+    render();
+  }
+
+  async function restorePurchase() {
+    await BillingManager.restore(true);
+    render();
+  }
+
   // 互換用
   async function selectProvider(id){await onProviderChange(id);}
   async function selectModel(p,m){await DB.Settings.set('ai_model_'+p,m);}
@@ -179,5 +212,5 @@ const SettingsPage = (() => {
 
   return {render,onProviderChange,onModelChange,toggleKey,saveKey,testKey,exportData,importData,clearAll,
     selectProvider,selectModel,toggleKeyVisibility,saveApiKey,testConnection,
-    saveFeedUrl,testFeed};
+    saveFeedUrl,testFeed,purchasePremium,restorePurchase};
 })();

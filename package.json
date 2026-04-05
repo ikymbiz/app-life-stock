@@ -1,0 +1,22 @@
+{
+  "name": "lifestock",
+  "version": "1.0.0",
+  "description": "LifeStock — 防災備蓄管理アプリ",
+  "scripts": {
+    "build":         "echo 'No build step required'",
+    "cap:add:android": "npx cap add android",
+    "cap:sync":      "npx cap sync",
+    "cap:open":      "npx cap open android",
+    "cap:run":       "npx cap run android"
+  },
+  "dependencies": {
+    "@capacitor/core":                       "^6.0.0",
+    "@capacitor/android":                    "^6.0.0",
+    "@capacitor/cli":                        "^6.0.0",
+    "@capacitor-community/admob":            "^6.0.0",
+    "@capacitor-community/in-app-purchases": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

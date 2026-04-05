@@ -122,7 +122,7 @@ const App = (() => {
   const pages = {
     dashboard: { module: () => DashboardPage, label: 'ホーム' },
     inventory:  { module: () => InventoryPage, label: '備蓄品' },
-    profiles:   { module: () => ProfilesPage, label: '健康カード' },
+    profiles:   { module: () => ProfilesPage, label: '家族' },
     shopping:   { module: () => ShoppingPage, label: '買い物リスト' },
     feed:       { module: () => FeedPage,     label: 'フィード' },
     settings:   { module: () => SettingsPage, label: '設定' },
@@ -142,6 +142,14 @@ const App = (() => {
     currentPage = page;
     const mod = pages[page].module();
     if (mod && mod.render) mod.render();
+
+    // AdMob バナー：広告対応ページのみ表示
+    const AD_PAGES = new Set(['dashboard', 'inventory', 'shopping', 'feed']);
+    if (AD_PAGES.has(page)) {
+      AdMobManager.showBanner(page);
+    } else {
+      AdMobManager.hideBanner();
+    }
   }
 
   function init() {
@@ -171,7 +179,7 @@ const App = (() => {
 
   async function showEmergencyCard() {
     const profiles = await DB.Profiles.getAll();
-    if (!profiles.length) { Toast.show('健康カードが登録されていません', 'error'); return; }
+    if (!profiles.length) { Toast.show('家族情報が登録されていません', 'error'); return; }
     let html = `<p style="color:var(--txt-3);font-size:13px;margin-bottom:12px;">
       救急隊員に提示する緊急医療情報を選択してください</p>
       <div style="display:flex;flex-direction:column;gap:8px;">`;

@@ -208,7 +208,7 @@ body { min-height:100dvh; }
   </button>
   <button class="nav-item flex flex-col items-center justify-center p-2 text-on-surface-variant hover:text-primary transition-all active:scale-90" data-page="profiles">
     <span class="material-symbols-rounded">person</span>
-    <span class="font-label text-[10px] font-bold mt-1">健康</span>
+    <span class="font-label text-[10px] font-bold mt-1">家族</span>
   </button>
 </nav>
 
@@ -237,6 +237,8 @@ body { min-height:100dvh; }
 
 <script src="db.js"></script>
 <script src="app.js"></script>
+<script src="admob.js"></script>
+<script src="billing.js"></script>
 <script src="vision.js"></script>
 <script src="barcode.js"></script>
 <script src="dashboard.js"></script>
@@ -250,6 +252,8 @@ body { min-height:100dvh; }
 (async () => {
   await DB.init();
   App.init();
+  // AdMob・課金の初期化（ネイティブのみ実行、Web では何もしない）
+  await Promise.all([AdMobManager.init(), BillingManager.init()]);
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
